@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Deliberately empty of network/iCloud entitlements — the app is fully
+	     offline (see spec: "No backend. No cloud. No server."). Add
+	     com.apple.developer.icloud-container-identifiers etc. here only if/when
+	     the Phase 2 optional cloud sync feature (see ROADMAP.md) is built. -->
+</dict>
+</plist>
