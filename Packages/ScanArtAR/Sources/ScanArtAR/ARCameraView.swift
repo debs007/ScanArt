@@ -224,10 +224,10 @@ public final class ARMeshCoordinator: NSObject, ARSCNViewDelegate {
         let node = SCNNode()
         let vc = meshAnchor.geometry.vertices.count
         let fc = meshAnchor.geometry.faces.count
-        lock.lock()
-        let useColors = _isRescan && _heatmapActive
-        lock.unlock()
-        node.geometry = buildGeometry(for: meshAnchor, vertexCount: vc, useColors: useColors)
+        // New anchors created after heatmap is frozen always start white — they
+        // were not present during the one-shot color pass and the alignment
+        // transform may have drifted since then.
+        node.geometry = buildGeometry(for: meshAnchor, vertexCount: vc, useColors: false)
         node.setValue(vc, forKeyPath: "vc")
         node.setValue(fc, forKeyPath: "fc")
         return node
@@ -251,8 +251,10 @@ public final class ARMeshCoordinator: NSObject, ARSCNViewDelegate {
             if newVC == oldVC && newFC == oldFC { return }
         }
 
-        // In rescan mode with heatmap active, update geometry with new colors.
-        // Do NOT recreate text labels here — they stay as stable reference points.
+        // ARKit updates the Metal buffer in-place when it refines an anchor.
+        // The SCNGeometry must be rebuilt so the color source aligns with the
+        // new vertex layout — skipping this causes colours to map onto the
+        // wrong triangles (the "all wrong colours" bug).
         node.geometry = buildGeometry(for: meshAnchor, vertexCount: newVC, useColors: isRescan && heatmapActive)
         node.setValue(newVC, forKeyPath: "vc")
         node.setValue(newFC, forKeyPath: "fc")
@@ -282,10 +284,15 @@ public final class ARMeshCoordinator: NSObject, ARSCNViewDelegate {
             node.setValue(vc, forKeyPath: "vc")
             node.setValue(fc, forKeyPath: "fc")
 
-            // Add floating distance label at the anchor's mesh centroid.
+            // Place label on the red (out-of-range) region when one exists;
+            // fall back to the overall centroid for normal heat-map anchors.
+            // Thresholds are 1 so even a small object covering a tiny slice of
+            // a large anchor still gets a label.
             let stats = computeMeshStats(arGeom: meshAnchor.geometry, transform: meshAnchor.transform, vertexCount: vc)
-            if stats.matchCount >= 5, stats.avgDistMM > 2.0 {
-                addLabelNode(to: node, avgDistMM: stats.avgDistMM, centroid: stats.centroid)
+            if stats.sampleCount >= 1 {
+                let labelCentroid = stats.outOfRangeCount >= 1 ? stats.outOfRangeCentroid : stats.centroid
+                let labelDistMM   = stats.outOfRangeCount >= 1 ? stats.outOfRangeAvgDistMM : stats.avgDistMM
+                addLabelNode(to: node, avgDistMM: labelDistMM, centroid: labelCentroid)
             }
         }
     }
@@ -349,8 +356,8 @@ public final class ARMeshCoordinator: NSObject, ARSCNViewDelegate {
         let target = _targetMM
         let tol = _tolMM
         let alignTx = _alignmentTransform
-        let boundsMin = _originalBoundsMin - Float(0.15)
-        let boundsMax = _originalBoundsMax + Float(0.15)
+        let boundsMin = _originalBoundsMin - Float(1.0)
+        let boundsMax = _originalBoundsMax + Float(1.0)
         lock.unlock()
 
         let stride = arGeom.vertices.stride
@@ -371,11 +378,17 @@ public final class ARMeshCoordinator: NSObject, ARSCNViewDelegate {
             let inBounds = queryPos.x >= boundsMin.x && queryPos.x <= boundsMax.x
                         && queryPos.y >= boundsMin.y && queryPos.y <= boundsMax.y
                         && queryPos.z >= boundsMin.z && queryPos.z <= boundsMax.z
-            if inBounds, let h = hash, let match = h.nearestNeighbor(to: queryPos, maxRadius: 0.15) {
-                let distMM = sqrt(match.distanceSquared) * 1000
-                (r, g, b, a) = heatColor(distMM, target: target, tol: tol)
+            if inBounds, let h = hash {
+                if let match = h.nearestNeighbor(to: queryPos, maxRadius: 0.15) {
+                    let distMM = sqrt(match.distanceSquared) * 1000
+                    (r, g, b, a) = heatColor(distMM, target: target, tol: tol)
+                } else {
+                    // Within the scanned area but no original surface within 15 cm:
+                    // something new placed in front of the wall (object, thick material).
+                    (r, g, b, a) = (0.95, 0.12, 0.12, 0.75)  // red — beyond range
+                }
             } else {
-                (r, g, b, a) = (0.55, 0.55, 0.55, 0.60)
+                (r, g, b, a) = (0.30, 0.30, 0.30, 0.35)  // outside scan area — dim
             }
             let base = i * 4
             rgba[base] = r; rgba[base + 1] = g; rgba[base + 2] = b; rgba[base + 3] = a
@@ -397,29 +410,41 @@ public final class ARMeshCoordinator: NSObject, ARSCNViewDelegate {
 
     /// Statistics computed from a sampled subset of vertices for label placement.
     private struct MeshAnchorStats {
-        let matchCount: Int
+        /// All vertices with a nearest-neighbour found within 1 m.
+        let sampleCount: Int
         let avgDistMM: Float
-        let centroid: SIMD3<Float>  // anchor-local space
+        let centroid: SIMD3<Float>          // anchor-local
+        /// Subset of vertices beyond the 15 cm heat-map cap (shown red).
+        let outOfRangeCount: Int
+        let outOfRangeAvgDistMM: Float
+        let outOfRangeCentroid: SIMD3<Float> // anchor-local
     }
 
-    /// Samples up to 200 vertices to compute average distance and centroid for
-    /// the label. Cheap compared to buildColorSource (no RGBA array allocation).
+    /// Samples up to 600 vertices, tracking in-range (≤15 cm) and out-of-range
+    /// (>15 cm) vertices separately so labels land on the correct coloured region.
+    /// 600 samples ensures small objects covering only ~3 % of a large anchor
+    /// still contribute 15–20 sampled vertices, enough for a stable centroid.
     private func computeMeshStats(arGeom: ARMeshGeometry, transform: simd_float4x4, vertexCount: Int) -> MeshAnchorStats {
         lock.lock()
         let hash = _spatialHash
         let alignTx = _alignmentTransform
-        let boundsMin = _originalBoundsMin - Float(0.15)
-        let boundsMax = _originalBoundsMax + Float(0.15)
+        let boundsMin = _originalBoundsMin - Float(1.0)
+        let boundsMax = _originalBoundsMax + Float(1.0)
         lock.unlock()
 
         let stride = arGeom.vertices.stride
         let dataOffset = arGeom.vertices.offset
         let basePtr = arGeom.vertices.buffer.contents().advanced(by: dataOffset)
-        let step = max(1, vertexCount / 200)
+        let step = max(1, vertexCount / 600)
 
         var centroidSum = SIMD3<Float>.zero
         var totalDist: Float = 0
         var count = 0
+
+        var oorCentroidSum = SIMD3<Float>.zero
+        var oorTotalDist: Float = 0
+        var oorCount = 0
+
         var i = 0
         while i < vertexCount {
             let ptr = basePtr.advanced(by: i * stride)
@@ -432,17 +457,27 @@ public final class ARMeshCoordinator: NSObject, ARSCNViewDelegate {
             let inBounds = queryPos.x >= boundsMin.x && queryPos.x <= boundsMax.x
                         && queryPos.y >= boundsMin.y && queryPos.y <= boundsMax.y
                         && queryPos.z >= boundsMin.z && queryPos.z <= boundsMax.z
-            if inBounds, let h = hash, let match = h.nearestNeighbor(to: queryPos, maxRadius: 0.15) {
+            if inBounds, let h = hash, let match = h.nearestNeighbor(to: queryPos, maxRadius: 1.0) {
+                let distM = sqrt(match.distanceSquared)
+                let distMM = distM * 1000
                 centroidSum += local
-                totalDist += sqrt(match.distanceSquared) * 1000
+                totalDist += distMM
                 count += 1
+                if distM > 0.15 {
+                    oorCentroidSum += local
+                    oorTotalDist += distMM
+                    oorCount += 1
+                }
             }
             i += step
         }
         return MeshAnchorStats(
-            matchCount: count,
+            sampleCount: count,
             avgDistMM: count > 0 ? totalDist / Float(count) : 0,
-            centroid: count > 0 ? centroidSum / Float(count) : .zero
+            centroid: count > 0 ? centroidSum / Float(count) : .zero,
+            outOfRangeCount: oorCount,
+            outOfRangeAvgDistMM: oorCount > 0 ? oorTotalDist / Float(oorCount) : 0,
+            outOfRangeCentroid: oorCount > 0 ? oorCentroidSum / Float(oorCount) : .zero
         )
     }
 
