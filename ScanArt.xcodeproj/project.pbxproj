@@ -31,6 +31,7 @@
 		D79300AB3026F94200F7F855 /* ControllerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300AA3026F94200F7F855 /* ControllerView.swift */; };
 		D79300AD3026FE0500F7F855 /* ProjectColorPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300AC3026FE0500F7F855 /* ProjectColorPalette.swift */; };
 		D79300AF3026FE1C00F7F855 /* ColorPaletteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300AE3026FE1C00F7F855 /* ColorPaletteEditorView.swift */; };
+		D79300B330270B6700F7F855 /* Assets 2.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D79300B03027060500F7F855 /* Assets 2.xcassets */; };
 		DB665F4002DCC0CFDDADAFE1 /* RescanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 739D2B79598B6DA92F8FC70E /* RescanViewModel.swift */; };
 		DB8EB0C09EE49CB034595484 /* ScanArtCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3F8BBC6C4DB58E437F80A097 /* ScanArtCore */; };
 		E1D9BC412E3DADAE8F499054 /* ScanArtPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = FCE76F03EFA406A9190FDF92 /* ScanArtPersistence */; };
@@ -61,6 +62,8 @@
 		D79300AA3026F94200F7F855 /* ControllerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControllerView.swift; sourceTree = "<group>"; };
 		D79300AC3026FE0500F7F855 /* ProjectColorPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectColorPalette.swift; sourceTree = "<group>"; };
 		D79300AE3026FE1C00F7F855 /* ColorPaletteEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPaletteEditorView.swift; sourceTree = "<group>"; };
+		D79300B03027060500F7F855 /* Assets 2.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets 2.xcassets"; sourceTree = "<group>"; };
+		D79300B13027061D00F7F855 /* Assets 3.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets 3.xcassets"; sourceTree = "<group>"; };
 		E5B3C374D194067412E3115C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		EB842A9915261FB94B13E76F /* ScanArtExport */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ScanArtExport; path = Packages/ScanArtExport; sourceTree = SOURCE_ROOT; };
 		F5B19735E0E0D9F7DB263F56 /* ReportListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportListView.swift; sourceTree = "<group>"; };
@@ -150,6 +153,8 @@
 				22DAFDC4A8F1652751608DBA /* RootView.swift */,
 				A41532E088FE6CD9CD3CA529 /* ScanArtApp.swift */,
 				E59CDDD930F44CC2116758F7 /* Features */,
+				D79300B03027060500F7F855 /* Assets 2.xcassets */,
+				D79300B13027061D00F7F855 /* Assets 3.xcassets */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -251,6 +256,7 @@
 			buildPhases = (
 				98841CEDC9842073F24B165A /* Sources */,
 				5D7882B4A85F4B2A7F35FC10 /* Frameworks */,
+				D79300B230270B5300F7F855 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -311,6 +317,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D79300B230270B5300F7F855 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D79300B330270B6700F7F855 /* Assets 2.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		98841CEDC9842073F24B165A /* Sources */ = {
