@@ -140,7 +140,14 @@ public enum ThicknessCalculator {
             let p0 = original.vertices[i]
             let n0 = original.normals[i]
 
-            var bestT: Float? = nil
+            // Track outward (+n0) and inward (-n0) hits separately so the
+            // outward direction always wins when both are found. The previous
+            // single-bestT approach compared raw positive t values from both
+            // directions, letting an inward hit replace a valid outward hit
+            // (or vice-versa) based on raw distance rather than direction.
+            var bestOutward: Float? = nil   // distance along +n0 (positive → surface grew)
+            var bestInward: Float? = nil    // distance along -n0 (positive raw distance)
+
             let candidates = triangleGrid.candidateFaces(near: p0, searchRadius: options.maxSearchDistance)
             for f in candidates {
                 let a = rescan.vertices[Int(rescan.indices[f * 3])]
@@ -148,18 +155,23 @@ public enum ThicknessCalculator {
                 let c = rescan.vertices[Int(rescan.indices[f * 3 + 2])]
 
                 if let t = RayTriangleIntersection.test(origin: p0, direction: n0, a: a, b: b, c: c),
-                   t <= options.maxSearchDistance, (bestT == nil || t < bestT!) {
-                    bestT = t
+                   t <= options.maxSearchDistance {
+                    if bestOutward == nil || t < bestOutward! { bestOutward = t }
                 }
                 if options.rayBothDirections,
                    let t = RayTriangleIntersection.test(origin: p0, direction: -n0, a: a, b: b, c: c),
-                   t <= options.maxSearchDistance, (bestT == nil || t < bestT!) {
-                    bestT = -t // negative side: surface receded rather than grew
+                   t <= options.maxSearchDistance {
+                    if bestInward == nil || t < bestInward! { bestInward = t }
                 }
             }
 
-            if let t = bestT {
+            // Prefer outward hit (surface grew). Only use inward hit as fallback
+            // when there is genuinely no outward intersection — this prevents a
+            // closer back-face hit from masking a valid thickness measurement.
+            if let t = bestOutward {
                 samples.append(ThicknessSample(position: p0, normal: n0, thicknessMM: t * 1000, isValid: true))
+            } else if let t = bestInward {
+                samples.append(ThicknessSample(position: p0, normal: n0, thicknessMM: -t * 1000, isValid: true))
             } else {
                 samples.append(ThicknessSample(position: p0, normal: n0, thicknessMM: 0, isValid: false))
             }

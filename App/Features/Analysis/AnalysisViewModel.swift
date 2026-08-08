@@ -152,6 +152,8 @@ final class AnalysisViewModel: ObservableObject {
             let isExcavation = project.projectType == .excavation
             let displaySamples: [ThicknessSample]
             if isExcavation {
+                // Excavation measures depth below original surface (negative signed
+                // distance). Flip to positive so the color scale reads naturally.
                 displaySamples = rawSamples.map { s in
                     s.isValid
                         ? ThicknessSample(position: s.position, normal: s.normal, thicknessMM: abs(s.thicknessMM), isValid: true)
