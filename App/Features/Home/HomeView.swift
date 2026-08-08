@@ -52,6 +52,9 @@ struct HomeView: View {
             SecondaryButton("All Projects", systemImage: "square.grid.2x2") {
                 path.append(AppRoute.projectList)
             }
+            SecondaryButton("Remote Control", systemImage: "display.2") {
+                path.append(AppRoute.remoteControl)
+            }
         }
     }
 

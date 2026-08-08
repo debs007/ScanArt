@@ -26,6 +26,11 @@
 		B6FB8B1F966BABE83AB0A296 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4217A35BB5D67DC6E80A791C /* HomeView.swift */; };
 		C424B46D97F5930B7DB3C6C7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5B3C374D194067412E3115C /* SettingsView.swift */; };
 		D4E6A1411476F36C6AADE807 /* AnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A456C77FC0134EB81C8DD2A3 /* AnalysisView.swift */; };
+		D79300A53026F8F200F7F855 /* RemoteControlSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300A43026F8F200F7F855 /* RemoteControlSession.swift */; };
+		D79300A73026F90600F7F855 /* RemoteControlHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300A63026F90600F7F855 /* RemoteControlHubView.swift */; };
+		D79300AB3026F94200F7F855 /* ControllerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300AA3026F94200F7F855 /* ControllerView.swift */; };
+		D79300AD3026FE0500F7F855 /* ProjectColorPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300AC3026FE0500F7F855 /* ProjectColorPalette.swift */; };
+		D79300AF3026FE1C00F7F855 /* ColorPaletteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300AE3026FE1C00F7F855 /* ColorPaletteEditorView.swift */; };
 		DB665F4002DCC0CFDDADAFE1 /* RescanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 739D2B79598B6DA92F8FC70E /* RescanViewModel.swift */; };
 		DB8EB0C09EE49CB034595484 /* ScanArtCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3F8BBC6C4DB58E437F80A097 /* ScanArtCore */; };
 		E1D9BC412E3DADAE8F499054 /* ScanArtPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = FCE76F03EFA406A9190FDF92 /* ScanArtPersistence */; };
@@ -51,6 +56,11 @@
 		AAC164351DCB450F30024376 /* ScanArtPersistence */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ScanArtPersistence; path = Packages/ScanArtPersistence; sourceTree = SOURCE_ROOT; };
 		CB6B685240C721ECB73A97C0 /* ProjectDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDetailView.swift; sourceTree = "<group>"; };
 		CF73746754D1C298442487C3 /* HelpAboutViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpAboutViews.swift; sourceTree = "<group>"; };
+		D79300A43026F8F200F7F855 /* RemoteControlSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlSession.swift; sourceTree = "<group>"; };
+		D79300A63026F90600F7F855 /* RemoteControlHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlHubView.swift; sourceTree = "<group>"; };
+		D79300AA3026F94200F7F855 /* ControllerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControllerView.swift; sourceTree = "<group>"; };
+		D79300AC3026FE0500F7F855 /* ProjectColorPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectColorPalette.swift; sourceTree = "<group>"; };
+		D79300AE3026FE1C00F7F855 /* ColorPaletteEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPaletteEditorView.swift; sourceTree = "<group>"; };
 		E5B3C374D194067412E3115C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		EB842A9915261FB94B13E76F /* ScanArtExport */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ScanArtExport; path = Packages/ScanArtExport; sourceTree = SOURCE_ROOT; };
 		F5B19735E0E0D9F7DB263F56 /* ReportListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportListView.swift; sourceTree = "<group>"; };
@@ -128,6 +138,8 @@
 			children = (
 				CB6B685240C721ECB73A97C0 /* ProjectDetailView.swift */,
 				5B52BD691E1EA130DF6C2808 /* ProjectListView.swift */,
+				D79300AC3026FE0500F7F855 /* ProjectColorPalette.swift */,
+				D79300AE3026FE1C00F7F855 /* ColorPaletteEditorView.swift */,
 			);
 			path = Projects;
 			sourceTree = "<group>";
@@ -177,6 +189,16 @@
 			);
 			sourceTree = "<group>";
 		};
+		D79300A23026F88400F7F855 /* RemoteControl 3 */ = {
+			isa = PBXGroup;
+			children = (
+				D79300A43026F8F200F7F855 /* RemoteControlSession.swift */,
+				D79300A63026F90600F7F855 /* RemoteControlHubView.swift */,
+				D79300AA3026F94200F7F855 /* ControllerView.swift */,
+			);
+			path = "RemoteControl 3";
+			sourceTree = "<group>";
+		};
 		E32EC3F50CD45D965ADAA6E2 /* Info */ = {
 			isa = PBXGroup;
 			children = (
@@ -198,6 +220,7 @@
 				B6050CE1F1D9BDA8ABF08F6A /* Scan */,
 				2CDAF776A4B52C4F900A4F6A /* Settings */,
 				3314FA3C2ECADD5524E01ADD /* Splash */,
+				D79300A23026F88400F7F855 /* RemoteControl 3 */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -302,14 +325,19 @@
 				92F9803E5786A79DC8ADE7B8 /* ProjectDetailView.swift in Sources */,
 				647A3B3B0C25F886A78A31D7 /* ProjectListView.swift in Sources */,
 				542D556A8F6CE31E7C830A15 /* ReportListView.swift in Sources */,
+				D79300AD3026FE0500F7F855 /* ProjectColorPalette.swift in Sources */,
 				34F209A236D8AE27389F5647 /* RescanView.swift in Sources */,
 				DB665F4002DCC0CFDDADAFE1 /* RescanViewModel.swift in Sources */,
 				57B61F78A02A0766BDCA38C1 /* RootView.swift in Sources */,
 				95BBEBBF06F3E3CA8EDB3A42 /* ScanArtApp.swift in Sources */,
 				129E3F46B9F7D5B153A1E965 /* ScanView.swift in Sources */,
+				D79300AB3026F94200F7F855 /* ControllerView.swift in Sources */,
+				D79300A53026F8F200F7F855 /* RemoteControlSession.swift in Sources */,
+				D79300A73026F90600F7F855 /* RemoteControlHubView.swift in Sources */,
 				A7C19D31CB1972B093B8C208 /* ScanViewModel.swift in Sources */,
 				C424B46D97F5930B7DB3C6C7 /* SettingsView.swift in Sources */,
 				973DEDE1FF86522250E1DC90 /* SplashView.swift in Sources */,
+				D79300AF3026FE1C00F7F855 /* ColorPaletteEditorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

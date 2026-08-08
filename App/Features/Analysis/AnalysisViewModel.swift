@@ -49,7 +49,7 @@ final class AnalysisViewModel: ObservableObject {
                 return
             }
             project = loadedProject
-            colorMapper = .standard(desiredThicknessMM: loadedProject.desiredThicknessMM, toleranceMM: loadedProject.toleranceMM)
+            colorMapper = loadedProject.colorMapper()
             guard let loadedScan = loadedProject.scans.first(where: { $0.id == scanID }) else {
                 errorMessage = "Scan not found."
                 return

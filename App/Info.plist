@@ -22,6 +22,13 @@
 	<string>Scan Art uses the camera to capture LiDAR scans for plaster thickness measurement.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Scan Art uses motion sensors to track device orientation during LiDAR scanning.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Scan Art uses your local network to connect with nearby devices for peer-to-peer screen sharing and remote control.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_scanart-remote._tcp</string>
+		<string>_scanart-remote._udp</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

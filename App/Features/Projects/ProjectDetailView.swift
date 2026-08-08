@@ -10,6 +10,7 @@ struct ProjectDetailView: View {
     @State private var project: Project?
     @State private var errorMessage: String?
     @State private var isShowingDeleteConfirmation = false
+    @State private var isEditingColors = false
 
     var body: some View {
         ScrollView {
@@ -29,6 +30,8 @@ struct ProjectDetailView: View {
                             path.append(AppRoute.reports(projectID: project.id))
                         }
                     }
+
+                    colorPaletteButton(for: project)
 
                     timeline(for: project)
                 }
@@ -55,6 +58,49 @@ struct ProjectDetailView: View {
         }
         .task { load() }
         .onAppear { load() }
+        .sheet(isPresented: $isEditingColors) {
+            if let project { ColorPaletteEditorView(project: project) }
+        }
+    }
+
+    private func colorPaletteButton(for project: Project) -> some View {
+        Button {
+            isEditingColors = true
+        } label: {
+            HStack(spacing: ScanArtTheme.spacingM) {
+                // Mini gradient swatch
+                let stops = project.colorMapper().stops
+                LinearGradient(
+                    colors: stops.map { Color(red: $0.color.r, green: $0.color.g, blue: $0.color.b) },
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: 36, height: 22)
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+
+                Text("Color Palette")
+                    .font(ScanArtTheme.body(16))
+                    .foregroundStyle(ScanArtTheme.textPrimary)
+
+                Spacer()
+
+                if project.hasCustomColors {
+                    Text("Custom")
+                        .font(ScanArtTheme.label())
+                        .foregroundStyle(ScanArtTheme.accent)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(ScanArtTheme.textTertiary)
+            }
+            .padding(ScanArtTheme.spacingM)
+            .background(
+                RoundedRectangle(cornerRadius: ScanArtTheme.radiusM, style: .continuous)
+                    .fill(ScanArtTheme.surfaceElevated)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private func summaryCard(for project: Project) -> some View {

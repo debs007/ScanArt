@@ -49,6 +49,11 @@ public final class Project {
     /// the model now so it round-trips through sync/export without a migration.
     public var isLocked: Bool
 
+    /// JSON-encoded array of [RGBAColor] overriding the default 8-band palette.
+    /// nil means use ThicknessColorMapper.standard(). Optional so SwiftData
+    /// lightweight-migrates existing rows without a schema version bump.
+    public var customColorStopsJSON: String? = nil
+
     @Relationship(deleteRule: .cascade, inverse: \ScanRecord.project)
     public var scans: [ScanRecord] = []
 
