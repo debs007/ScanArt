@@ -28,6 +28,13 @@ public enum ThicknessMethod: Sendable {
     /// on rough/lumpy plaster — this is what "Generate thickness map" (the final
     /// analysis step) uses.
     case rayMeshIntersection
+    /// Groups both meshes into uniform spatial cells, averages vertices within
+    /// each cell, then matches each original cell to the nearest rescan cell and
+    /// measures the displacement projected onto the original cell's normal.
+    /// More robust to ARKit mesh noise than per-vertex ray casting because many
+    /// noisy readings are averaged before the comparison, at the cost of slightly
+    /// lower spatial resolution (controlled by patchCellSize).
+    case patchMatching
 }
 
 public enum ThicknessCalculator {
@@ -42,6 +49,11 @@ public enum ThicknessCalculator {
         /// Ray cast is tried along +normal and -normal; whichever hits first wins.
         /// This tolerates small alignment noise that flips which side is "outward".
         public var rayBothDirections: Bool = true
+        /// Side length of the cubic spatial cells used by patchMatching (meters).
+        /// Smaller → finer detail but less noise averaging. 4 cm is a good default
+        /// for typical plaster (1–5 cm thick): each cell averages ~10–50 ARKit
+        /// vertices, enough to cancel mesh noise without blurring plaster features.
+        public var patchCellSize: Float = 0.04
 
         public init() {}
     }
@@ -68,6 +80,10 @@ public enum ThicknessCalculator {
             return await computeChunked(original: original) { range in
                 rayCastChunk(original: original, rescan: rescan, triangleGrid: triangleGrid, range: range, options: options)
             }
+        case .patchMatching:
+            return await Task.detached(priority: .userInitiated) {
+                patchMatch(original: original, rescan: rescan, options: options)
+            }.value
         }
     }
 
@@ -174,6 +190,95 @@ public enum ThicknessCalculator {
                 samples.append(ThicknessSample(position: p0, normal: n0, thicknessMM: -t * 1000, isValid: true))
             } else {
                 samples.append(ThicknessSample(position: p0, normal: n0, thicknessMM: 0, isValid: false))
+            }
+        }
+        return samples
+    }
+
+    /// Groups both meshes into uniform cubic cells, averages vertices in each cell,
+    /// then for each original cell finds the nearest rescan cell and projects the
+    /// centroid-to-centroid displacement onto the original cell's averaged normal.
+    /// This is the patchMatching implementation.
+    private static func patchMatch(
+        original: MeshBuffer,
+        rescan: MeshBuffer,
+        options: Options
+    ) -> [ThicknessSample] {
+        let cs = options.patchCellSize
+
+        struct CellKey: Hashable {
+            let x, y, z: Int32
+            init(_ p: SIMD3<Float>, _ size: Float) {
+                x = Int32(floor(p.x / size))
+                y = Int32(floor(p.y / size))
+                z = Int32(floor(p.z / size))
+            }
+        }
+        struct OrigCell {
+            var posSum: SIMD3<Float> = .zero
+            var normSum: SIMD3<Float> = .zero
+            var count: Int = 0
+            var indices: [Int] = []
+        }
+
+        // Group original vertices into spatial cells
+        var origMap: [CellKey: OrigCell] = [:]
+        origMap.reserveCapacity(original.vertices.count / 4)
+        for i in 0..<original.vertices.count {
+            let key = CellKey(original.vertices[i], cs)
+            var cell = origMap[key] ?? OrigCell()
+            cell.posSum += original.vertices[i]
+            cell.normSum += original.normals[i]
+            cell.count += 1
+            cell.indices.append(i)
+            origMap[key] = cell
+        }
+
+        // Group rescan vertices into cells, then compute centroids
+        var rescanMap: [CellKey: (posSum: SIMD3<Float>, count: Int)] = [:]
+        rescanMap.reserveCapacity(rescan.vertices.count / 4)
+        for p in rescan.vertices {
+            let key = CellKey(p, cs)
+            let existing = rescanMap[key] ?? (.zero, 0)
+            rescanMap[key] = (existing.posSum + p, existing.count + 1)
+        }
+        var rescanCentroids: [SIMD3<Float>] = []
+        rescanCentroids.reserveCapacity(rescanMap.count)
+        for (_, data) in rescanMap {
+            rescanCentroids.append(data.posSum / Float(data.count))
+        }
+
+        // Spatial hash over rescan cell centroids for nearest-cell lookup
+        let rescanGrid = SpatialHashGrid(points: rescanCentroids, cellSize: cs * 2)
+
+        // Build output aligned 1-to-1 with original.vertices
+        var samples = [ThicknessSample](
+            repeating: ThicknessSample(position: .zero, normal: .zero, thicknessMM: 0, isValid: false),
+            count: original.vertices.count
+        )
+
+        for (_, origCell) in origMap {
+            let n = Float(origCell.count)
+            let origCentroid = origCell.posSum / n
+            let origNormal = normalize(origCell.normSum / n)
+
+            var thicknessMM: Float = 0
+            var isValid = false
+
+            if let match = rescanGrid.nearestNeighbor(to: origCentroid, maxRadius: options.maxSearchDistance) {
+                let rescanCentroid = rescanCentroids[Int(match.index)]
+                // Project displacement onto averaged normal → true thickness direction
+                thicknessMM = dot(rescanCentroid - origCentroid, origNormal) * 1000
+                isValid = true
+            }
+
+            for idx in origCell.indices {
+                samples[idx] = ThicknessSample(
+                    position: original.vertices[idx],
+                    normal: origNormal,
+                    thicknessMM: thicknessMM,
+                    isValid: isValid
+                )
             }
         }
         return samples

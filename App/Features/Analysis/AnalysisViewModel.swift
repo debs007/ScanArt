@@ -145,7 +145,9 @@ final class AnalysisViewModel: ObservableObject {
             let originalWall = originalMesh.faceClassifications.isEmpty ? originalMesh : originalMesh.filteredByFace { $0.isMeasurementTarget }
             let targetForMeasurement = originalWall.vertices.isEmpty ? originalMesh : originalWall
 
-            let rawSamples = await ThicknessCalculator.compute(original: targetForMeasurement, rescan: alignedRescanMesh)
+            var analysisOptions = ThicknessCalculator.Options()
+            analysisOptions.method = .patchMatching
+            let rawSamples = await ThicknessCalculator.compute(original: targetForMeasurement, rescan: alignedRescanMesh, options: analysisOptions)
 
             // For excavation: flip signs so stats/rendering see positive depth values.
             // Volume uses the original signed samples so direction filtering works.
