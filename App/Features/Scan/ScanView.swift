@@ -13,6 +13,7 @@ struct ScanView: View {
     @StateObject private var viewModel = ScanViewModelBox()
     @State private var isShowingFinishSheet = false
     @State private var scanLabel = ""
+    @State private var showUI = true
 
     var body: some View {
         ZStack {
@@ -23,9 +24,13 @@ struct ScanView: View {
                 VStack {
                     topBar(vm: vm)
                     Spacer()
-                    bottomBar(vm: vm)
+                    if showUI {
+                        bottomBar(vm: vm)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
                 .padding(ScanArtTheme.spacingM)
+                .animation(.easeInOut(duration: 0.2), value: showUI)
 
                 if let error = vm.errorMessage {
                     errorToast(error)
@@ -62,6 +67,14 @@ struct ScanView: View {
                     .glassPanel(cornerRadius: ScanArtTheme.radiusS)
             }
             Spacer()
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showUI.toggle() }
+            } label: {
+                Image(systemName: showUI ? "eye.slash" : "eye")
+                    .foregroundStyle(ScanArtTheme.textPrimary)
+                    .padding(ScanArtTheme.spacingS)
+                    .glassPanel(cornerRadius: ScanArtTheme.radiusS)
+            }
             CoverageRing(percent: vm.sessionManager.estimatedCoveragePercent)
         }
     }

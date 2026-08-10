@@ -88,7 +88,7 @@ struct HomeView: View {
                 Button {
                     path.append(AppRoute.projectDetail(projectID: project.id))
                 } label: {
-                    ProjectRow(project: project)
+                    ProjectRow(project: project, thumbnailURL: thumbnailURL(for: project))
                 }
                 .buttonStyle(.plain)
             }
@@ -103,21 +103,28 @@ struct HomeView: View {
             loadError = error.localizedDescription
         }
     }
+
+    // MARK: - Thumbnail helpers
+
+    func thumbnailURL(for project: Project) -> URL? {
+        guard let filename = project.thumbnailFileName else { return nil }
+        guard let appSupport = try? FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: false) else { return nil }
+        return appSupport.appendingPathComponent("ScanArt/Projects/\(project.id.uuidString)/Images/\(filename)")
+    }
 }
 
 struct ProjectRow: View {
     let project: Project
+    var thumbnailURL: URL? = nil
 
     var body: some View {
         HStack(spacing: ScanArtTheme.spacingM) {
-            ZStack {
-                RoundedRectangle(cornerRadius: ScanArtTheme.radiusS)
-                    .fill(ScanArtTheme.accentMuted)
-                    .frame(width: 48, height: 48)
-                Image(systemName: "square.stack.3d.up")
-                    .foregroundStyle(ScanArtTheme.accent)
-                    .font(.system(size: 20, weight: .light))
-            }
+            thumbnailView
+                .frame(width: 52, height: 52)
+                .background(ScanArtTheme.accentMuted)
+                .clipShape(RoundedRectangle(cornerRadius: ScanArtTheme.radiusS))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(project.name)
@@ -130,6 +137,9 @@ struct ProjectRow: View {
                         .font(ScanArtTheme.body(12))
                         .foregroundStyle(ScanArtTheme.textSecondary)
                 }
+                Text(project.dateCreated, style: .date)
+                    .font(ScanArtTheme.label(10))
+                    .foregroundStyle(ScanArtTheme.textTertiary)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
@@ -149,5 +159,28 @@ struct ProjectRow: View {
             RoundedRectangle(cornerRadius: ScanArtTheme.radiusM, style: .continuous)
                 .fill(ScanArtTheme.surfaceElevated)
         )
+    }
+
+    @ViewBuilder
+    private var thumbnailView: some View {
+        if let url = thumbnailURL {
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                } else {
+                    defaultIcon
+                }
+            }
+            // Force new AsyncImage when thumbnail is replaced
+            .id(project.dateModified)
+        } else {
+            defaultIcon
+        }
+    }
+
+    private var defaultIcon: some View {
+        Image(systemName: "square.stack.3d.up")
+            .foregroundStyle(ScanArtTheme.accent)
+            .font(.system(size: 20, weight: .light))
     }
 }

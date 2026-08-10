@@ -32,6 +32,7 @@
 		D79300AD3026FE0500F7F855 /* ProjectColorPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300AC3026FE0500F7F855 /* ProjectColorPalette.swift */; };
 		D79300AF3026FE1C00F7F855 /* ColorPaletteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300AE3026FE1C00F7F855 /* ColorPaletteEditorView.swift */; };
 		D79300B330270B6700F7F855 /* Assets 2.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D79300B03027060500F7F855 /* Assets 2.xcassets */; };
+		D79300B53029F3B600F7F855 /* EditProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300B43029F3B600F7F855 /* EditProjectView.swift */; };
 		DB665F4002DCC0CFDDADAFE1 /* RescanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 739D2B79598B6DA92F8FC70E /* RescanViewModel.swift */; };
 		DB8EB0C09EE49CB034595484 /* ScanArtCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3F8BBC6C4DB58E437F80A097 /* ScanArtCore */; };
 		E1D9BC412E3DADAE8F499054 /* ScanArtPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = FCE76F03EFA406A9190FDF92 /* ScanArtPersistence */; };
@@ -64,6 +65,7 @@
 		D79300AE3026FE1C00F7F855 /* ColorPaletteEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPaletteEditorView.swift; sourceTree = "<group>"; };
 		D79300B03027060500F7F855 /* Assets 2.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets 2.xcassets"; sourceTree = "<group>"; };
 		D79300B13027061D00F7F855 /* Assets 3.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets 3.xcassets"; sourceTree = "<group>"; };
+		D79300B43029F3B600F7F855 /* EditProjectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProjectView.swift; sourceTree = "<group>"; };
 		E5B3C374D194067412E3115C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		EB842A9915261FB94B13E76F /* ScanArtExport */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ScanArtExport; path = Packages/ScanArtExport; sourceTree = SOURCE_ROOT; };
 		F5B19735E0E0D9F7DB263F56 /* ReportListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportListView.swift; sourceTree = "<group>"; };
@@ -143,6 +145,7 @@
 				5B52BD691E1EA130DF6C2808 /* ProjectListView.swift */,
 				D79300AC3026FE0500F7F855 /* ProjectColorPalette.swift */,
 				D79300AE3026FE1C00F7F855 /* ColorPaletteEditorView.swift */,
+				D79300B43029F3B600F7F855 /* EditProjectView.swift */,
 			);
 			path = Projects;
 			sourceTree = "<group>";
@@ -344,6 +347,7 @@
 				542D556A8F6CE31E7C830A15 /* ReportListView.swift in Sources */,
 				D79300AD3026FE0500F7F855 /* ProjectColorPalette.swift in Sources */,
 				34F209A236D8AE27389F5647 /* RescanView.swift in Sources */,
+				D79300B53029F3B600F7F855 /* EditProjectView.swift in Sources */,
 				DB665F4002DCC0CFDDADAFE1 /* RescanViewModel.swift in Sources */,
 				57B61F78A02A0766BDCA38C1 /* RootView.swift in Sources */,
 				95BBEBBF06F3E3CA8EDB3A42 /* ScanArtApp.swift in Sources */,

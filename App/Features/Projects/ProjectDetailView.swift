@@ -11,6 +11,7 @@ struct ProjectDetailView: View {
     @State private var errorMessage: String?
     @State private var isShowingDeleteConfirmation = false
     @State private var isEditingColors = false
+    @State private var isEditingProject = false
 
     var body: some View {
         ScrollView {
@@ -45,6 +46,11 @@ struct ProjectDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button { isEditingProject = true } label: {
+                    Image(systemName: "pencil")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button(role: .destructive) {
                     isShowingDeleteConfirmation = true
                 } label: {
@@ -60,6 +66,9 @@ struct ProjectDetailView: View {
         .onAppear { load() }
         .sheet(isPresented: $isEditingColors) {
             if let project { ColorPaletteEditorView(project: project) }
+        }
+        .sheet(isPresented: $isEditingProject) {
+            if let project { EditProjectView(project: project, onSaved: { load() }) }
         }
     }
 

@@ -21,7 +21,7 @@ struct ProjectListView: View {
                         Button {
                             path.append(AppRoute.projectDetail(projectID: project.id))
                         } label: {
-                            ProjectRow(project: project)
+                            ProjectRow(project: project, thumbnailURL: thumbnailURL(for: project))
                         }
                         .buttonStyle(.plain)
                     }
@@ -65,5 +65,15 @@ struct ProjectListView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // MARK: - Thumbnail helpers
+
+    private func thumbnailURL(for project: Project) -> URL? {
+        guard let filename = project.thumbnailFileName else { return nil }
+        guard let appSupport = try? FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: false) else { return nil }
+        return appSupport.appendingPathComponent("ScanArt/Projects/\(project.id.uuidString)/Images/\(filename)")
     }
 }

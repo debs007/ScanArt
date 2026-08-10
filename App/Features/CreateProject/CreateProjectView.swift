@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 import ScanArtCore
 import ScanArtUI
 
@@ -21,11 +22,48 @@ struct CreateProjectView: View {
     // Slider values stored in the currently selected unit
     @State private var desiredThickness: Double = 4.0   // default 4 cm = 40 mm
     @State private var tolerance: Double = 0.2          // default 0.2 cm = 2 mm
+    @State private var thumbnailItem: PhotosPickerItem?
+    @State private var thumbnailImage: UIImage?
     @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    HStack {
+                        Spacer()
+                        PhotosPicker(selection: $thumbnailItem, matching: .images) {
+                            if let image = thumbnailImage {
+                                Image(uiImage: image)
+                                    .resizable().scaledToFill()
+                                    .frame(width: 88, height: 88)
+                                    .clipShape(RoundedRectangle(cornerRadius: ScanArtTheme.radiusM))
+                                    .overlay(RoundedRectangle(cornerRadius: ScanArtTheme.radiusM).stroke(ScanArtTheme.accent, lineWidth: 2))
+                            } else {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "photo.badge.plus")
+                                        .font(.system(size: 28))
+                                        .foregroundStyle(ScanArtTheme.accent)
+                                    Text("Add Photo")
+                                        .font(ScanArtTheme.body(12))
+                                        .foregroundStyle(ScanArtTheme.accent)
+                                }
+                                .frame(width: 88, height: 88)
+                                .background(ScanArtTheme.accentMuted)
+                                .clipShape(RoundedRectangle(cornerRadius: ScanArtTheme.radiusM))
+                            }
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                    if thumbnailImage != nil {
+                        Button("Remove Photo", role: .destructive) {
+                            thumbnailImage = nil
+                            thumbnailItem = nil
+                        }
+                    }
+                } header: { Label("Project Photo", systemImage: "photo") }
+
                 Section {
                     iconRow("folder.fill", color: ScanArtTheme.accent) {
                         TextField("Project name *", text: $name)
@@ -129,6 +167,15 @@ struct CreateProjectView: View {
                     Section {
                         Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(ScanArtTheme.statusDanger)
+                    }
+                }
+            }
+            .onChange(of: thumbnailItem) { _, item in
+                guard let item else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        thumbnailImage = image
                     }
                 }
             }
@@ -240,9 +287,22 @@ struct CreateProjectView: View {
 
         do {
             try di.projectRepository.createProject(project)
+            if let image = thumbnailImage { saveThumbnail(image, for: project) }
             onCreated(project.id)
         } catch {
             errorMessage = "Couldn't create project: \(error.localizedDescription)"
         }
+    }
+
+    private func saveThumbnail(_ image: UIImage, for project: Project) {
+        let thumb = image.preparingThumbnail(of: CGSize(width: 120, height: 120)) ?? image
+        guard let data = thumb.jpegData(compressionQuality: 0.8) else { return }
+        guard let appSupport = try? FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: false) else { return }
+        let folder = appSupport.appendingPathComponent("ScanArt/Projects/\(project.id.uuidString)/Images")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? data.write(to: folder.appendingPathComponent("thumbnail.jpg"), options: .atomic)
+        project.thumbnailFileName = "thumbnail.jpg"
     }
 }

@@ -36,7 +36,10 @@ final class RemoteControlSession: NSObject {
     private var mcSession: MCSession?
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
-    private let ciContext = CIContext()
+    // GPU-backed context — software renderer is too slow for real-time screen frames
+    private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+    // Prevents frame queue buildup: if encoding is in progress, new frames are dropped
+    private let encodeLock = NSLock()
 
     private static let frameMarker = UInt8(0x01)
     private static let touchMarker = UInt8(0x02)
@@ -125,11 +128,22 @@ final class RemoteControlSession: NSObject {
         recorder.isMicrophoneEnabled = false
         recorder.startCapture { [weak self] sampleBuffer, bufferType, error in
             guard let self, bufferType == .video, error == nil,
-                  let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer),
-                  !self.connectedPeers.isEmpty else { return }
+                  !self.connectedPeers.isEmpty,
+                  let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+            // Drop this frame if the previous one is still encoding.
+            // This prevents a growing queue of stale frames that causes 10s+ latency.
+            guard self.encodeLock.try() else { return }
+            defer { self.encodeLock.unlock() }
+
             let ci = CIImage(cvPixelBuffer: pixelBuffer)
-            guard let cg = self.ciContext.createCGImage(ci, from: ci.extent),
-                  let jpeg = UIImage(cgImage: cg).jpegData(compressionQuality: 0.35) else { return }
+            // Scale down to 720px wide before encoding — full-res JPEG is large and slow
+            let scale = min(1.0, 720.0 / ci.extent.width)
+            let scaledCI = scale < 1.0
+                ? ci.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+                : ci
+            guard let cg = self.ciContext.createCGImage(scaledCI, from: scaledCI.extent),
+                  let jpeg = UIImage(cgImage: cg).jpegData(compressionQuality: 0.4) else { return }
             var data = Data([Self.frameMarker])
             data.append(jpeg)
             try? self.mcSession?.send(data, toPeers: self.connectedPeers, with: .unreliable)
