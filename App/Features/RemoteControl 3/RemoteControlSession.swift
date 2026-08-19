@@ -40,6 +40,8 @@ final class RemoteControlSession: NSObject {
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
     // Prevents frame queue buildup: if encoding is in progress, new frames are dropped
     private let encodeLock = NSLock()
+    // Tracks last touch position for computing scroll deltas from touchMoved events
+    private var previousTouchPoint: CGPoint?
 
     private static let frameMarker = UInt8(0x01)
     private static let touchMarker = UInt8(0x02)
@@ -156,6 +158,98 @@ final class RemoteControlSession: NSObject {
     }
 }
 
+// MARK: - Remote touch execution (broadcaster side)
+
+extension RemoteControlSession {
+
+    private func keyWindow() -> UIWindow? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first(where: { $0.activationState == .foregroundActive })?
+            .windows.first(where: { $0.isKeyWindow })
+    }
+
+    private func performRemoteTouch(_ event: RemoteTouchEvent) {
+        guard let window = keyWindow() else { return }
+        let point = CGPoint(
+            x: CGFloat(event.normalizedX) * window.bounds.width,
+            y: CGFloat(event.normalizedY) * window.bounds.height
+        )
+
+        switch event.kind {
+        case .touchBegan:
+            previousTouchPoint = point
+
+        case .touchMoved:
+            guard let prev = previousTouchPoint else { previousTouchPoint = point; return }
+            let delta = CGPoint(x: point.x - prev.x, y: point.y - prev.y)
+            previousTouchPoint = point
+            scrollIfPossible(at: point, in: window, delta: delta)
+
+        case .touchEnded:
+            previousTouchPoint = nil
+
+        case .tap:
+            // Path 1: UIKit controls (UIButton, UISegmentedControl, etc.)
+            if let hitView = window.hitTest(point, with: nil) {
+                var responder: UIResponder? = hitView
+                while let r = responder {
+                    if let control = r as? UIControl {
+                        control.sendActions(for: .touchUpInside)
+                        return
+                    }
+                    responder = r.next
+                }
+            }
+            // Path 2: Accessibility element tree — reaches SwiftUI Buttons
+            activateElement(at: point, in: window)
+        }
+    }
+
+    /// Finds the nearest UIScrollView ancestor at `point` and adjusts its contentOffset by `delta`.
+    private func scrollIfPossible(at point: CGPoint, in window: UIWindow, delta: CGPoint) {
+        guard let hitView = window.hitTest(point, with: nil) else { return }
+        var current: UIView? = hitView
+        while let view = current {
+            if let sv = view as? UIScrollView, sv.isScrollEnabled {
+                let maxX = max(0, sv.contentSize.width - sv.bounds.width)
+                let maxY = max(0, sv.contentSize.height - sv.bounds.height)
+                let newX = min(max(0, sv.contentOffset.x - delta.x), maxX)
+                let newY = min(max(0, sv.contentOffset.y - delta.y), maxY)
+                sv.setContentOffset(CGPoint(x: newX, y: newY), animated: false)
+                return
+            }
+            current = view.superview
+        }
+    }
+
+    /// Recursively walks the accessibility element tree to find and activate the element
+    /// at `point` (screen coordinates). Works for SwiftUI Buttons and other accessible controls.
+    @discardableResult
+    private func activateElement(at point: CGPoint, in element: NSObject) -> Bool {
+        // Skip frame check for the root window — it covers the whole screen
+        if !(element is UIWindow) {
+            guard element.accessibilityFrame.contains(point) else { return false }
+            let activatable: UIAccessibilityTraits = [.button, .link, .adjustable]
+            if !element.accessibilityTraits.intersection(activatable).isEmpty,
+               element.accessibilityActivate() {
+                return true
+            }
+        }
+        // Recurse into virtual accessibility children (SwiftUI elements live here)
+        for child in (element.accessibilityElements as? [NSObject] ?? []) {
+            if activateElement(at: point, in: child) { return true }
+        }
+        // Recurse into UIView subviews for UIKit-hosted hierarchies
+        if let view = element as? UIView {
+            for subview in view.subviews.reversed() {
+                if activateElement(at: point, in: subview) { return true }
+            }
+        }
+        return false
+    }
+}
+
 // MARK: - MCSessionDelegate
 
 extension RemoteControlSession: MCSessionDelegate {
@@ -187,6 +281,7 @@ extension RemoteControlSession: MCSessionDelegate {
             DispatchQueue.main.async {
                 self.lastRemoteTouch = event
                 self.touchEventID += 1
+                if self.role == .broadcaster { self.performRemoteTouch(event) }
             }
         default:
             break

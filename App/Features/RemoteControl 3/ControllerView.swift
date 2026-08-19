@@ -7,6 +7,9 @@ import ScanArtUI
 struct ControllerView: View {
     let session: RemoteControlSession
 
+    @State private var isDragging = false
+    @State private var tapIndicatorPoint: CGPoint?
+
     var body: some View {
         Group {
             if session.connectedPeers.isEmpty {
@@ -164,22 +167,56 @@ struct ControllerView: View {
     }
 
     private func screenView(image: UIImage, containerSize: CGSize) -> some View {
-        Image(uiImage: image)
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .frame(width: containerSize.width, height: containerSize.height)
-            .background(Color.black)
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onEnded { value in
-                        let frame = imageDisplayFrame(imageSize: image.size, in: containerSize)
-                        guard frame.width > 0, frame.height > 0 else { return }
-                        let nx = (value.location.x - frame.minX) / frame.width
-                        let ny = (value.location.y - frame.minY) / frame.height
-                        guard (0...1).contains(nx), (0...1).contains(ny) else { return }
-                        session.sendTouch(RemoteTouchEvent(kind: .tap, normalizedX: nx, normalizedY: ny))
+        let frame = imageDisplayFrame(imageSize: image.size, in: containerSize)
+
+        func normalized(_ location: CGPoint) -> (nx: Double, ny: Double)? {
+            guard frame.width > 0, frame.height > 0 else { return nil }
+            let nx = (location.x - frame.minX) / frame.width
+            let ny = (location.y - frame.minY) / frame.height
+            guard (0...1).contains(nx), (0...1).contains(ny) else { return nil }
+            return (Double(nx), Double(ny))
+        }
+
+        return ZStack {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: containerSize.width, height: containerSize.height)
+
+            if let pt = tapIndicatorPoint {
+                Circle()
+                    .stroke(Color.white.opacity(0.75), lineWidth: 2)
+                    .frame(width: 44, height: 44)
+                    .position(x: pt.x, y: pt.y)
+                    .allowsHitTesting(false)
+                    .transition(.opacity.combined(with: .scale(scale: 0.4)))
+            }
+        }
+        .background(Color.black)
+        .animation(.easeOut(duration: 0.2), value: tapIndicatorPoint == nil)
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    guard let (nx, ny) = normalized(value.location) else { return }
+                    if !isDragging {
+                        isDragging = true
+                        session.sendTouch(RemoteTouchEvent(kind: .touchBegan, normalizedX: nx, normalizedY: ny))
+                    } else {
+                        session.sendTouch(RemoteTouchEvent(kind: .touchMoved, normalizedX: nx, normalizedY: ny))
                     }
-            )
+                }
+                .onEnded { value in
+                    isDragging = false
+                    guard let (nx, ny) = normalized(value.location) else { return }
+                    session.sendTouch(RemoteTouchEvent(kind: .touchEnded, normalizedX: nx, normalizedY: ny))
+                    session.sendTouch(RemoteTouchEvent(kind: .tap, normalizedX: nx, normalizedY: ny))
+                    withAnimation(.easeOut(duration: 0.15)) { tapIndicatorPoint = value.location }
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(400))
+                        withAnimation(.easeIn(duration: 0.15)) { tapIndicatorPoint = nil }
+                    }
+                }
+        )
     }
 
     private var waitingView: some View {

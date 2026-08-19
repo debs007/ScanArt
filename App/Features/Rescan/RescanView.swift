@@ -4,6 +4,7 @@ import Combine
 import ScanArtAR
 import ScanArtUI
 import ScanArtCore
+import ScanArtAlgorithms
 
 struct RescanView: View {
     let projectID: UUID
@@ -13,6 +14,7 @@ struct RescanView: View {
     @StateObject private var viewModel = RescanViewModelBox()
     @State private var isShowingFinishSheet = false
     @State private var scanLabel = ""
+    @State private var showUI = true
 
     var body: some View {
         ZStack {
@@ -37,9 +39,13 @@ struct RescanView: View {
                 VStack {
                     topBar(vm: vm)
                     Spacer()
-                    bottomBar(vm: vm)
+                    if showUI {
+                        bottomBar(vm: vm)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
                 .padding(ScanArtTheme.spacingM)
+                .animation(.easeInOut(duration: 0.2), value: showUI)
 
                 if let error = vm.errorMessage {
                     errorToast(error)
@@ -78,6 +84,14 @@ struct RescanView: View {
                     .glassPanel(cornerRadius: ScanArtTheme.radiusS)
             }
             Spacer()
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showUI.toggle() }
+            } label: {
+                Image(systemName: showUI ? "eye.slash" : "eye")
+                    .foregroundStyle(ScanArtTheme.textPrimary)
+                    .padding(ScanArtTheme.spacingS)
+                    .glassPanel(cornerRadius: ScanArtTheme.radiusS)
+            }
             CoverageRing(percent: vm.sessionManager.estimatedCoveragePercent)
         }
     }
@@ -87,7 +101,11 @@ struct RescanView: View {
         VStack(spacing: ScanArtTheme.spacingS) {
             // Color legend — only visible once the heatmap is actually applied.
             if vm.heatmapGenerated {
-                ThicknessColorLegend(labels: vm.projectType.legendLabels)
+                ThicknessColorLegend(
+                    targetMM: Double(vm.targetThicknessMM),
+                    toleranceMM: Double(vm.toleranceMM),
+                    unit: vm.measurementUnit
+                )
             }
 
             // Swipeable stat pages — page dots stay within the fixed frame.
@@ -248,30 +266,51 @@ struct RescanView: View {
     }
 
     private struct ThicknessColorLegend: View {
-        var labels: [String]
+        let targetMM: Double
+        let toleranceMM: Double
+        let unit: MeasurementUnit
 
-        private static let colors: [Color] = [
-            Color(red: 0.14, green: 0.38, blue: 0.95),
-            Color(red: 0.92, green: 0.88, blue: 0.12),
-            Color(red: 0.14, green: 0.88, blue: 0.30),
-            Color(red: 0.95, green: 0.52, blue: 0.10),
-            Color(red: 0.95, green: 0.12, blue: 0.12),
-        ]
+        private var stops: [ColorStop] {
+            ThicknessColorMapper.liveLegend(desiredThicknessMM: targetMM, toleranceMM: toleranceMM)
+        }
 
         var body: some View {
             HStack(spacing: 10) {
-                ForEach(Array(zip(Self.colors, labels).enumerated()), id: \.offset) { _, pair in
+                ForEach(Array(stops.enumerated()), id: \.offset) { index, stop in
                     HStack(spacing: 4) {
-                        Circle().fill(pair.0).frame(width: 9, height: 9)
-                        Text(pair.1)
+                        Circle()
+                            .fill(Color(red: stop.color.r, green: stop.color.g, blue: stop.color.b))
+                            .frame(width: 9, height: 9)
+                        Text(rangeLabel(index: index))
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.white)
+                            .fixedSize()
                     }
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+
+        private func rangeLabel(index: Int) -> String {
+            let lower = targetMM - toleranceMM
+            let upper = targetMM + toleranceMM
+            let thick = upper * 1.3
+            switch index {
+            case 0: return "< \(fmt(lower))"
+            case 1: return "\(fmt(lower))–\(fmt(upper))"
+            case 2: return "\(fmt(upper))–\(fmt(thick))"
+            default: return "> \(fmt(thick))"
+            }
+        }
+
+        private func fmt(_ mm: Double) -> String {
+            switch unit {
+            case .millimeters: return "\(Int(mm.rounded()))mm"
+            case .centimeters: return String(format: "%.1fcm", mm / 10)
+            case .inches:      return String(format: "%.2f\"", mm / 25.4)
+            }
         }
     }
 

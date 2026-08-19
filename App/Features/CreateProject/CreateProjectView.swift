@@ -207,9 +207,9 @@ struct CreateProjectView: View {
 
     private var thicknessRange: ClosedRange<Double> {
         switch unit {
-        case .millimeters: return 0...100
-        case .centimeters: return 0...10
-        case .inches:      return 0...4
+        case .millimeters: return 0...500
+        case .centimeters: return 0...50
+        case .inches:      return 0...20
         }
     }
 
@@ -223,9 +223,9 @@ struct CreateProjectView: View {
 
     private var toleranceRange: ClosedRange<Double> {
         switch unit {
-        case .millimeters: return 0...10
-        case .centimeters: return 0...1
-        case .inches:      return 0...0.4
+        case .millimeters: return 0...50
+        case .centimeters: return 0...5
+        case .inches:      return 0...2
         }
     }
 

@@ -108,7 +108,7 @@ struct RootView: View {
         }
     }
 
-    // MARK: - Remote touch forwarding
+    // MARK: - Remote touch forwarding (cursor only — execution is in RemoteControlSession)
 
     private func handleRemoteTouch(_ event: RemoteTouchEvent) {
         guard let scene = UIApplication.shared.connectedScenes
@@ -121,25 +121,16 @@ struct RootView: View {
         )
 
         remoteCursorPosition = screenPoint
-        showRemoteCursor = true
 
-        if event.kind == .tap {
-            performTap(at: screenPoint, in: window)
+        switch event.kind {
+        case .touchBegan, .touchMoved:
+            showRemoteCursor = true
+        case .touchEnded:
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { showRemoteCursor = false }
+        case .tap:
+            showRemoteCursor = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { showRemoteCursor = false }
         }
-    }
-
-    private func performTap(at point: CGPoint, in window: UIWindow) {
-        guard let hitView = window.hitTest(point, with: nil) else { return }
-        var view: UIView? = hitView
-        while let v = view {
-            if let control = v as? UIControl {
-                control.sendActions(for: .touchUpInside)
-                return
-            }
-            view = v.superview
-        }
-        hitView.accessibilityActivate()
     }
 }
 
