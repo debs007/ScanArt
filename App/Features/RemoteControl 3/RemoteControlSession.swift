@@ -2,6 +2,7 @@ import Foundation
 import MultipeerConnectivity
 import ReplayKit
 import CoreMedia
+import CoreImage
 import UIKit
 import Observation
 
@@ -35,6 +36,8 @@ final class RemoteControlSession: NSObject {
     private var mcSession: MCSession?
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
+    // CIImage handles any pixel format RPScreenRecorder may deliver (BGRA, YUV, IOSurface-backed)
+    private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
     // Prevents frame queue buildup: if encoding is in progress, new frames are dropped
     private let encodeLock = NSLock()
     private var lastFrameTime: Double = 0
@@ -141,8 +144,8 @@ final class RemoteControlSession: NSObject {
                 guard let self, bufferType == .video, error == nil,
                       let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-                // Cap at 15 fps. MPC can't usefully deliver 60 fps; sending more frames
-                // just queues stale data and increases latency.
+                // Hard cap at 15 fps — sending more than the pipe can carry just queues
+                // stale frames and increases latency without improving UX.
                 let now = CACurrentMediaTime()
                 guard now - self.lastFrameTime >= 0.067 else { return }
 
@@ -150,13 +153,22 @@ final class RemoteControlSession: NSObject {
                 guard self.encodeLock.try() else { return }
                 self.lastFrameTime = now
 
-                guard let jpeg = Self.encodeFrame(pixelBuffer) else {
+                // CIImage handles any format RPScreenRecorder may deliver (BGRA, YUV,
+                // IOSurface-backed). Scale to 320px wide before GPU→CPU readback so the
+                // readback is small and fast (~400 KB vs ~14 MB at full retina resolution).
+                let ci = CIImage(cvPixelBuffer: pixelBuffer)
+                let scale = min(1.0, 320.0 / ci.extent.width)
+                let scaledCI = scale < 1.0
+                    ? ci.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+                    : ci
+                guard let cg = self.ciContext.createCGImage(scaledCI, from: scaledCI.extent),
+                      let jpeg = UIImage(cgImage: cg).jpegData(compressionQuality: 0.25) else {
                     self.encodeLock.unlock()
                     return
                 }
-                // Unlock BEFORE sending. mcSession.send with .unreliable is fire-and-forget
-                // but can briefly stall when its internal buffer is full. Holding the lock
-                // through the send was starving the encode loop and causing 10s+ frame gaps.
+                // Unlock BEFORE send. mcSession.send with .unreliable can briefly stall when
+                // its output buffer is full — holding the lock through the send was blocking
+                // all new encodes and causing 10s+ frame gaps.
                 self.encodeLock.unlock()
 
                 var packet = Data([Self.frameMarker])
@@ -175,36 +187,6 @@ final class RemoteControlSession: NSObject {
         }
     }
 
-    // Encodes a CVPixelBuffer to JPEG entirely on CPU.
-    // Uses CGContext to wrap the pixel buffer memory directly (zero-copy source read),
-    // then UIGraphicsImageRenderer to scale + compress. This avoids the GPU→CPU
-    // readback latency of CIContext.createCGImage which was the primary bottleneck.
-    private static func encodeFrame(_ pixelBuffer: CVPixelBuffer) -> Data? {
-        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
-
-        let srcW = CVPixelBufferGetWidth(pixelBuffer)
-        let srcH = CVPixelBufferGetHeight(pixelBuffer)
-        let dstW = min(srcW, 320)
-        let dstH = srcW > dstW ? srcH * dstW / srcW : srcH
-
-        guard let baseAddr = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
-        // RPScreenRecorder delivers BGRA32 frames on iOS.
-        let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
-        guard let srcCtx = CGContext(
-            data: baseAddr,
-            width: srcW, height: srcH,
-            bitsPerComponent: 8,
-            bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: bitmapInfo
-        ), let srcImage = srcCtx.makeImage() else { return nil }
-
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: dstW, height: dstH))
-        return renderer.image { _ in
-            UIImage(cgImage: srcImage).draw(in: CGRect(x: 0, y: 0, width: dstW, height: dstH))
-        }.jpegData(compressionQuality: 0.2)
-    }
 }
 
 // MARK: - Remote touch execution (broadcaster side)
