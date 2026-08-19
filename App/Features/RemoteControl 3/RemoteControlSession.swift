@@ -2,7 +2,6 @@ import Foundation
 import MultipeerConnectivity
 import ReplayKit
 import CoreMedia
-import CoreImage
 import UIKit
 import Observation
 
@@ -36,10 +35,9 @@ final class RemoteControlSession: NSObject {
     private var mcSession: MCSession?
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
-    // GPU-backed context — software renderer is too slow for real-time screen frames
-    private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
     // Prevents frame queue buildup: if encoding is in progress, new frames are dropped
     private let encodeLock = NSLock()
+    private var lastFrameTime: Double = 0
     // Tracks last touch position for computing scroll deltas from touchMoved events
     private var previousTouchPoint: CGPoint?
     // Thread-safe mirror of connectedPeers for the capture background thread.
@@ -135,31 +133,34 @@ final class RemoteControlSession: NSObject {
     private func beginScreenCapture() {
         let recorder = RPScreenRecorder.shared()
         recorder.isMicrophoneEnabled = false
-        // Stop any leftover capture before starting fresh.
-        // startCapture silently fails if called while a previous session is still active,
-        // which happens when the user stops and restarts broadcasting in the same app session.
+        // Stop any leftover capture before starting fresh — startCapture silently fails
+        // if called while a previous session is still active.
         recorder.stopCapture { [weak self] _ in
             guard let self else { return }
             recorder.startCapture { [weak self] sampleBuffer, bufferType, error in
                 guard let self, bufferType == .video, error == nil,
                       let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-                // Drop this frame if the previous encode is still in progress.
-                guard self.encodeLock.try() else { return }
-                defer { self.encodeLock.unlock() }
+                // Cap at 15 fps. MPC can't usefully deliver 60 fps; sending more frames
+                // just queues stale data and increases latency.
+                let now = CACurrentMediaTime()
+                guard now - self.lastFrameTime >= 0.067 else { return }
 
-                let ci = CIImage(cvPixelBuffer: pixelBuffer)
-                let scale = min(1.0, 720.0 / ci.extent.width)
-                let scaledCI = scale < 1.0
-                    ? ci.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-                    : ci
-                guard let cg = self.ciContext.createCGImage(scaledCI, from: scaledCI.extent),
-                      let jpeg = UIImage(cgImage: cg).jpegData(compressionQuality: 0.4) else { return }
+                // Drop frame if previous encode is still running.
+                guard self.encodeLock.try() else { return }
+                self.lastFrameTime = now
+
+                guard let jpeg = Self.encodeFrame(pixelBuffer) else {
+                    self.encodeLock.unlock()
+                    return
+                }
+                // Unlock BEFORE sending. mcSession.send with .unreliable is fire-and-forget
+                // but can briefly stall when its internal buffer is full. Holding the lock
+                // through the send was starving the encode loop and causing 10s+ frame gaps.
+                self.encodeLock.unlock()
+
                 var packet = Data([Self.frameMarker])
                 packet.append(jpeg)
-                // Read peers under lock — written on main thread, read here on the capture thread.
-                // This avoids dispatching to main thread for every frame (which at 60 Hz floods
-                // the main runloop and causes the multi-second latency the user observed).
                 self.capturePeersLock.lock()
                 let peers = self.capturePeers
                 self.capturePeersLock.unlock()
@@ -172,6 +173,37 @@ final class RemoteControlSession: NSObject {
                 }
             }
         }
+    }
+
+    // Encodes a CVPixelBuffer to JPEG entirely on CPU.
+    // Uses CGContext to wrap the pixel buffer memory directly (zero-copy source read),
+    // then UIGraphicsImageRenderer to scale + compress. This avoids the GPU→CPU
+    // readback latency of CIContext.createCGImage which was the primary bottleneck.
+    private static func encodeFrame(_ pixelBuffer: CVPixelBuffer) -> Data? {
+        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+
+        let srcW = CVPixelBufferGetWidth(pixelBuffer)
+        let srcH = CVPixelBufferGetHeight(pixelBuffer)
+        let dstW = min(srcW, 320)
+        let dstH = srcW > dstW ? srcH * dstW / srcW : srcH
+
+        guard let baseAddr = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
+        // RPScreenRecorder delivers BGRA32 frames on iOS.
+        let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
+        guard let srcCtx = CGContext(
+            data: baseAddr,
+            width: srcW, height: srcH,
+            bitsPerComponent: 8,
+            bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: bitmapInfo
+        ), let srcImage = srcCtx.makeImage() else { return nil }
+
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: dstW, height: dstH))
+        return renderer.image { _ in
+            UIImage(cgImage: srcImage).draw(in: CGRect(x: 0, y: 0, width: dstW, height: dstH))
+        }.jpegData(compressionQuality: 0.2)
     }
 }
 
