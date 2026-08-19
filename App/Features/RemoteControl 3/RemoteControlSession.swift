@@ -42,6 +42,11 @@ final class RemoteControlSession: NSObject {
     private let encodeLock = NSLock()
     // Tracks last touch position for computing scroll deltas from touchMoved events
     private var previousTouchPoint: CGPoint?
+    // Thread-safe mirror of connectedPeers for the capture background thread.
+    // capturePeers is written on the main thread (under lock) and read on the
+    // capture thread (under lock) so frames are sent without a main-thread dispatch.
+    private let capturePeersLock = NSLock()
+    private var capturePeers: [MCPeerID] = []
 
     private static let frameMarker = UInt8(0x01)
     private static let touchMarker = UInt8(0x02)
@@ -73,6 +78,7 @@ final class RemoteControlSession: NSObject {
         mcSession?.disconnect()
         mcSession = nil
         connectedPeers = []
+        capturePeersLock.lock(); capturePeers = []; capturePeersLock.unlock()
         role = nil
         captureError = nil
     }
@@ -112,6 +118,7 @@ final class RemoteControlSession: NSObject {
         mcSession = nil
         connectedPeers = []
         availablePeers = []
+        capturePeersLock.lock(); capturePeers = []; capturePeersLock.unlock()
         isCaptureActive = false
         captureError = nil
         role = nil
@@ -128,31 +135,41 @@ final class RemoteControlSession: NSObject {
     private func beginScreenCapture() {
         let recorder = RPScreenRecorder.shared()
         recorder.isMicrophoneEnabled = false
-        recorder.startCapture { [weak self] sampleBuffer, bufferType, error in
-            guard let self, bufferType == .video, error == nil,
-                  !self.connectedPeers.isEmpty,
-                  let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        // Stop any leftover capture before starting fresh.
+        // startCapture silently fails if called while a previous session is still active,
+        // which happens when the user stops and restarts broadcasting in the same app session.
+        recorder.stopCapture { [weak self] _ in
+            guard let self else { return }
+            recorder.startCapture { [weak self] sampleBuffer, bufferType, error in
+                guard let self, bufferType == .video, error == nil,
+                      let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-            // Drop this frame if the previous one is still encoding.
-            // This prevents a growing queue of stale frames that causes 10s+ latency.
-            guard self.encodeLock.try() else { return }
-            defer { self.encodeLock.unlock() }
+                // Drop this frame if the previous encode is still in progress.
+                guard self.encodeLock.try() else { return }
+                defer { self.encodeLock.unlock() }
 
-            let ci = CIImage(cvPixelBuffer: pixelBuffer)
-            // Scale down to 720px wide before encoding — full-res JPEG is large and slow
-            let scale = min(1.0, 720.0 / ci.extent.width)
-            let scaledCI = scale < 1.0
-                ? ci.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-                : ci
-            guard let cg = self.ciContext.createCGImage(scaledCI, from: scaledCI.extent),
-                  let jpeg = UIImage(cgImage: cg).jpegData(compressionQuality: 0.4) else { return }
-            var data = Data([Self.frameMarker])
-            data.append(jpeg)
-            try? self.mcSession?.send(data, toPeers: self.connectedPeers, with: .unreliable)
-        } completionHandler: { [weak self] error in
-            DispatchQueue.main.async {
-                self?.captureError = error?.localizedDescription
-                self?.isCaptureActive = error == nil
+                let ci = CIImage(cvPixelBuffer: pixelBuffer)
+                let scale = min(1.0, 720.0 / ci.extent.width)
+                let scaledCI = scale < 1.0
+                    ? ci.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+                    : ci
+                guard let cg = self.ciContext.createCGImage(scaledCI, from: scaledCI.extent),
+                      let jpeg = UIImage(cgImage: cg).jpegData(compressionQuality: 0.4) else { return }
+                var packet = Data([Self.frameMarker])
+                packet.append(jpeg)
+                // Read peers under lock — written on main thread, read here on the capture thread.
+                // This avoids dispatching to main thread for every frame (which at 60 Hz floods
+                // the main runloop and causes the multi-second latency the user observed).
+                self.capturePeersLock.lock()
+                let peers = self.capturePeers
+                self.capturePeersLock.unlock()
+                guard !peers.isEmpty else { return }
+                try? self.mcSession?.send(packet, toPeers: peers, with: .unreliable)
+            } completionHandler: { [weak self] error in
+                DispatchQueue.main.async {
+                    self?.captureError = error?.localizedDescription
+                    self?.isCaptureActive = error == nil
+                }
             }
         }
     }
@@ -190,10 +207,13 @@ extension RemoteControlSession {
             previousTouchPoint = nil
 
         case .tap:
-            // Path 1: UIKit controls (UIButton, UISegmentedControl, etc.)
             if let hitView = window.hitTest(point, with: nil) {
                 var responder: UIResponder? = hitView
                 while let r = responder {
+                    // Text inputs must becomeFirstResponder to show the keyboard —
+                    // sendActions(for: .touchUpInside) on UIControl won't do it.
+                    if let tf = r as? UITextField { tf.becomeFirstResponder(); return }
+                    if let tv = r as? UITextView  { tv.becomeFirstResponder(); return }
                     if let control = r as? UIControl {
                         control.sendActions(for: .touchUpInside)
                         return
@@ -201,7 +221,7 @@ extension RemoteControlSession {
                     responder = r.next
                 }
             }
-            // Path 2: Accessibility element tree — reaches SwiftUI Buttons
+            // Accessibility element tree — reaches SwiftUI Buttons and TextFields
             activateElement(at: point, in: window)
         }
     }
@@ -265,6 +285,10 @@ extension RemoteControlSession: MCSessionDelegate {
             default:
                 break
             }
+            // Keep the capture-thread-safe mirror in sync
+            self.capturePeersLock.lock()
+            self.capturePeers = self.connectedPeers
+            self.capturePeersLock.unlock()
         }
     }
 
