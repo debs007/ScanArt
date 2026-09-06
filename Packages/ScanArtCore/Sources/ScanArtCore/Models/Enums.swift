@@ -75,7 +75,7 @@ public enum ProjectType: String, Codable, CaseIterable, Sendable, Identifiable {
 
     public var displayName: String {
         switch self {
-        case .plaster:    return "Plaster / Coating"
+        case .plaster:    return "Shotcrete / Coating"
         case .excavation: return "Excavation / Removal"
         }
     }

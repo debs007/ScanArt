@@ -43,6 +43,8 @@ final class RemoteControlSession: NSObject {
     private var lastFrameTime: Double = 0
     // Tracks last touch position for computing scroll deltas from touchMoved events
     private var previousTouchPoint: CGPoint?
+    // Tracks a UISlider the remote finger is dragging so we can map x-position to value
+    private weak var trackedSlider: UISlider?
     // Thread-safe mirror of connectedPeers for the capture background thread.
     // capturePeers is written on the main thread (under lock) and read on the
     // capture thread (under lock) so frames are sent without a main-thread dispatch.
@@ -210,15 +212,41 @@ extension RemoteControlSession {
         switch event.kind {
         case .touchBegan:
             previousTouchPoint = point
+            // Detect whether the finger landed on a UISlider so touchMoved can drag it
+            trackedSlider = nil
+            if let hitView = window.hitTest(point, with: nil) {
+                var v: UIView? = hitView
+                while let view = v {
+                    if let sl = view as? UISlider { trackedSlider = sl; break }
+                    v = view.superview
+                }
+            }
 
         case .touchMoved:
             guard let prev = previousTouchPoint else { previousTouchPoint = point; return }
             let delta = CGPoint(x: point.x - prev.x, y: point.y - prev.y)
             previousTouchPoint = point
-            scrollIfPossible(at: point, in: window, delta: delta)
+            if let slider = trackedSlider {
+                // Map absolute x position to a slider value using the track's real rect.
+                // UISlider.trackRect gives inset bounds inside the thumb hitbox padding.
+                let trackInSlider = slider.trackRect(forBounds: slider.bounds)
+                let trackInWindow = slider.convert(trackInSlider, to: window)
+                guard trackInWindow.width > 0 else { break }
+                let rawFraction = (point.x - trackInWindow.minX) / trackInWindow.width
+                let fraction = max(0, min(1, rawFraction))
+                let newValue = slider.minimumValue + Float(fraction) * (slider.maximumValue - slider.minimumValue)
+                slider.setValue(newValue, animated: false)
+                slider.sendActions(for: .valueChanged)
+            } else {
+                scrollIfPossible(at: point, in: window, delta: delta)
+            }
 
         case .touchEnded:
+            if let slider = trackedSlider {
+                slider.sendActions(for: .touchUpInside)
+            }
             previousTouchPoint = nil
+            trackedSlider = nil
 
         case .tap:
             if let hitView = window.hitTest(point, with: nil) {

@@ -21,7 +21,7 @@ struct CreateProjectView: View {
     @State private var projectType: ProjectType = .plaster
     // Slider values stored in the currently selected unit
     @State private var desiredThickness: Double = 4.0   // default 4 cm = 40 mm
-    @State private var tolerance: Double = 0.2          // default 0.2 cm = 2 mm
+    @State private var tolerance: Double = 0.2          // default 5% of 4 cm
     @State private var thumbnailItem: PhotosPickerItem?
     @State private var thumbnailImage: UIImage?
     @State private var errorMessage: String?
@@ -29,6 +29,7 @@ struct CreateProjectView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // Photo
                 Section {
                     HStack {
                         Spacer()
@@ -64,6 +65,7 @@ struct CreateProjectView: View {
                     }
                 } header: { Label("Project Photo", systemImage: "photo") }
 
+                // Project
                 Section {
                     iconRow("folder.fill", color: ScanArtTheme.accent) {
                         TextField("Project name *", text: $name)
@@ -79,24 +81,7 @@ struct CreateProjectView: View {
                     Label("Project", systemImage: "briefcase")
                 }
 
-                Section {
-                    iconRow("mappin.circle.fill", color: .red) {
-                        TextField("Site", text: $siteName)
-                    }
-                    iconRow("building.2.fill", color: .orange) {
-                        TextField("Building", text: $buildingName)
-                    }
-                    iconRow("door.left.hand.open", color: .teal) {
-                        TextField("Room", text: $roomName)
-                    }
-                    iconRow("square.stack.fill", color: .indigo) {
-                        TextField("Floor number", text: $floorNumber)
-                            .keyboardType(.numberPad)
-                    }
-                } header: {
-                    Label("Location", systemImage: "location")
-                }
-
+                // Work type + thickness (moved above Location per user request)
                 Section {
                     Picker(selection: $projectType) {
                         ForEach(ProjectType.allCases) { type in
@@ -126,16 +111,12 @@ struct CreateProjectView: View {
                                 .monospacedDigit()
                                 .fontWeight(.semibold)
                         }
-                        Slider(
-                            value: $desiredThickness,
-                            in: thicknessRange,
-                            step: thicknessStep
-                        )
-                        .tint(ScanArtTheme.accent)
+                        Slider(value: $desiredThickness, in: thicknessRange, step: thicknessStep)
+                            .tint(ScanArtTheme.accent)
                     }
                     .padding(.vertical, 4)
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Label("Tolerance (±)", systemImage: "plusminus")
                                 .foregroundStyle(.primary)
@@ -145,16 +126,46 @@ struct CreateProjectView: View {
                                 .monospacedDigit()
                                 .fontWeight(.semibold)
                         }
-                        Slider(
-                            value: $tolerance,
-                            in: toleranceRange,
-                            step: toleranceStep
-                        )
-                        .tint(.orange)
+                        Slider(value: $tolerance, in: toleranceRange, step: toleranceStep)
+                            .tint(.orange)
+                        // Recommended tolerance hint (5 % of target thickness)
+                        HStack(spacing: 6) {
+                            Image(systemName: "lightbulb.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.orange.opacity(0.7))
+                            Text("Recommended: \(recommendedToleranceDisplay)")
+                                .font(ScanArtTheme.body(11))
+                                .foregroundStyle(ScanArtTheme.textTertiary)
+                            if abs(tolerance - recommendedTolerance) > toleranceStep * 0.4 {
+                                Button("Use") { tolerance = recommendedTolerance }
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(ScanArtTheme.accent)
+                            }
+                            Spacer()
+                        }
                     }
                     .padding(.vertical, 4)
                 } header: {
                     Label("Target \(projectType.thicknessLabel)", systemImage: "chart.bar.xaxis")
+                }
+
+                // Location
+                Section {
+                    iconRow("mappin.circle.fill", color: .red) {
+                        TextField("Site", text: $siteName)
+                    }
+                    iconRow("building.2.fill", color: .orange) {
+                        TextField("Building", text: $buildingName)
+                    }
+                    iconRow("door.left.hand.open", color: .teal) {
+                        TextField("Room", text: $roomName)
+                    }
+                    iconRow("square.stack.fill", color: .indigo) {
+                        TextField("Floor number", text: $floorNumber)
+                            .keyboardType(.numberPad)
+                    }
+                } header: {
+                    Label("Location", systemImage: "location")
                 }
 
                 Section {
@@ -180,14 +191,16 @@ struct CreateProjectView: View {
                 }
             }
             .onChange(of: unit) { old, new in
-                // Convert the slider values to the new unit so the physical
-                // quantity stays the same after switching units.
                 let desMM = old.toMillimeters(desiredThickness)
                 let tolMM = old.toMillimeters(tolerance)
                 let newDes = new.fromMillimeters(desMM)
                 let newTol = new.fromMillimeters(tolMM)
                 desiredThickness = min(max(thicknessRange.lowerBound, newDes), thicknessRange.upperBound)
                 tolerance = min(max(toleranceRange.lowerBound, newTol), toleranceRange.upperBound)
+            }
+            .onChange(of: desiredThickness) { _, _ in
+                // Auto-sync tolerance to 5 % of new target thickness
+                tolerance = recommendedTolerance
             }
             .navigationTitle("New Project")
             .navigationBarTitleDisplayMode(.inline)
@@ -215,9 +228,9 @@ struct CreateProjectView: View {
 
     private var thicknessStep: Double {
         switch unit {
-        case .millimeters: return 1.0
-        case .centimeters: return 0.1
-        case .inches:      return 0.05
+        case .millimeters: return 5.0    // 0.5 cm resolution
+        case .centimeters: return 0.5
+        case .inches:      return 0.25
         }
     }
 
@@ -237,6 +250,14 @@ struct CreateProjectView: View {
         }
     }
 
+    // 5 % of target thickness, snapped to nearest tolerance step
+    private var recommendedTolerance: Double {
+        let raw = desiredThickness * 0.05
+        let step = toleranceStep
+        let snapped = (raw / step).rounded() * step
+        return min(max(toleranceRange.lowerBound, snapped), toleranceRange.upperBound)
+    }
+
     // MARK: - Display formatting
 
     private var thicknessDisplay: String {
@@ -252,6 +273,15 @@ struct CreateProjectView: View {
         case .millimeters: return String(format: "%.1f mm", tolerance)
         case .centimeters: return String(format: "%.2f cm", tolerance)
         case .inches:      return String(format: "%.2f in", tolerance)
+        }
+    }
+
+    private var recommendedToleranceDisplay: String {
+        let rec = recommendedTolerance
+        switch unit {
+        case .millimeters: return String(format: "%.1f mm", rec)
+        case .centimeters: return String(format: "%.2f cm", rec)
+        case .inches:      return String(format: "%.2f in", rec)
         }
     }
 

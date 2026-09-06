@@ -5,6 +5,7 @@ import ScanArtUI
 
 struct SettingsView: View {
     @AppStorage("scanart.defaultUnit") private var defaultUnitRawValue: String = MeasurementUnit.centimeters.rawValue
+    @AppStorage("scanart.language") private var selectedLanguage: String = "en"
     @State private var availableStorageMB: Double?
 
     private var defaultUnit: Binding<MeasurementUnit> {
@@ -23,6 +24,20 @@ struct SettingsView: View {
                 Text("Used to pre-fill new projects. Each project can still use its own unit.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Language") {
+                Picker("Language", selection: $selectedLanguage) {
+                    Text("English").tag("en")
+                    Text("Español").tag("es")
+                }
+                Text("Language change takes effect after restarting the app.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .onChange(of: selectedLanguage) { _, newLang in
+                UserDefaults.standard.set([newLang], forKey: "AppleLanguages")
+                UserDefaults.standard.synchronize()
             }
 
             Section("Storage") {

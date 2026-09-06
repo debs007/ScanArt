@@ -326,9 +326,9 @@ struct EditProjectView: View {
     }
     private var thicknessStep: Double {
         switch unit {
-        case .millimeters: return 1.0
-        case .centimeters: return 0.1
-        case .inches:      return 0.05
+        case .millimeters: return 5.0    // 0.5 cm resolution
+        case .centimeters: return 0.5
+        case .inches:      return 0.25
         }
     }
     private var toleranceRange: ClosedRange<Double> {

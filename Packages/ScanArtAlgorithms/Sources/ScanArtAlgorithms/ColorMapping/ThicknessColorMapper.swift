@@ -75,15 +75,18 @@ public struct ThicknessColorMapper: Sendable, Codable {
     public static func standard(desiredThicknessMM: Double, toleranceMM: Double) -> ThicknessColorMapper {
         let lower = desiredThicknessMM - toleranceMM
         let upper = desiredThicknessMM + toleranceMM
+        // 20 % over-application threshold — only meaningful when it falls above the
+        // tolerance upper bound (i.e. tolerance < 20 % of target, which is typical).
+        let overApplication = max(upper * 1.01, desiredThicknessMM * 1.2)
         return ThicknessColorMapper(stops: [
-            ColorStop(thicknessMM: 0, color: RGBAColor(r: 0.05, g: 0.05, b: 0.45), label: "Very thin"),
-            ColorStop(thicknessMM: lower * 0.6, color: RGBAColor(r: 0.10, g: 0.35, b: 0.95), label: "Below target"),
-            ColorStop(thicknessMM: lower, color: RGBAColor(r: 0.10, g: 0.80, b: 0.35), label: "Within tolerance"),
+            ColorStop(thicknessMM: 0,               color: RGBAColor(r: 0.05, g: 0.05, b: 0.45), label: "Very thin"),
+            ColorStop(thicknessMM: lower * 0.6,     color: RGBAColor(r: 0.10, g: 0.35, b: 0.95), label: "Below target"),
+            ColorStop(thicknessMM: lower,            color: RGBAColor(r: 0.10, g: 0.80, b: 0.35), label: "Within tolerance"),
             ColorStop(thicknessMM: desiredThicknessMM, color: RGBAColor(r: 0.20, g: 0.85, b: 0.30), label: "On target"),
-            ColorStop(thicknessMM: upper, color: RGBAColor(r: 0.95, g: 0.85, b: 0.15), label: "Slightly thick"),
-            ColorStop(thicknessMM: upper * 1.3, color: RGBAColor(r: 0.95, g: 0.55, b: 0.10), label: "Thick"),
-            ColorStop(thicknessMM: upper * 1.7, color: RGBAColor(r: 0.90, g: 0.15, b: 0.15), label: "Very thick"),
-            ColorStop(thicknessMM: upper * 2.2, color: RGBAColor(r: 0.55, g: 0.15, b: 0.75), label: "Extremely thick")
+            ColorStop(thicknessMM: upper,            color: RGBAColor(r: 0.95, g: 0.85, b: 0.15), label: "Slightly thick"),
+            ColorStop(thicknessMM: overApplication,  color: RGBAColor(r: 0.95, g: 0.45, b: 0.05), label: "Over-application (20%)"),
+            ColorStop(thicknessMM: upper * 1.5,     color: RGBAColor(r: 0.90, g: 0.15, b: 0.15), label: "Very thick"),
+            ColorStop(thicknessMM: upper * 2.0,     color: RGBAColor(r: 0.55, g: 0.15, b: 0.75), label: "Extremely thick")
         ])
     }
 

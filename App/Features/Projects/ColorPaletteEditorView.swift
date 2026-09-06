@@ -29,6 +29,8 @@ struct ColorPaletteEditorView: View {
     @FocusState private var focusedIndex: Int?
 
     private var unitLabel: String { project.unit.rawValue }
+    // Stepper increment: 0.5 cm expressed in the project's display unit
+    private var stepSize: Double { project.unit.fromMillimeters(5.0) }
 
     var body: some View {
         NavigationStack {
@@ -112,13 +114,13 @@ struct ColorPaletteEditorView: View {
                 ForEach(Array(stops.enumerated()), id: \.offset) { index, stop in
                     let fraction = normalizedPosition(index: index)
                     Text(index == 0 ? "0" : formatted(stop.thresholdDisplay))
-                        .font(.system(size: 9, weight: .medium, design: .monospaced))
-                        .foregroundStyle(ScanArtTheme.textTertiary)
-                        .position(x: fraction * geo.size.width, y: 6)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(ScanArtTheme.textSecondary)
+                        .position(x: fraction * geo.size.width, y: 8)
                 }
             }
         }
-        .frame(height: 12)
+        .frame(height: 16)
     }
 
     // MARK: - Band list
@@ -160,21 +162,37 @@ struct ColorPaletteEditorView: View {
                             .font(ScanArtTheme.monospacedValue(13))
                             .foregroundStyle(ScanArtTheme.textTertiary)
                     } else {
+                        // Stepper buttons (±0.5 cm) flanking the text field
+                        Button {
+                            stops[index].thresholdDisplay = max(0, stops[index].thresholdDisplay - stepSize)
+                            clampThreshold(at: index)
+                        } label: {
+                            Image(systemName: "minus.circle")
+                                .foregroundStyle(ScanArtTheme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+
                         TextField("0",
                                   value: $stops[index].thresholdDisplay,
-                                  format: .number.precision(.fractionLength(0...2)))
+                                  format: .number.precision(.fractionLength(1)))
                             .keyboardType(.decimalPad)
                             .font(ScanArtTheme.monospacedValue(13))
                             .foregroundStyle(ScanArtTheme.textPrimary)
-                            .frame(width: 72)
+                            .frame(width: 64)
                             .multilineTextAlignment(.trailing)
                             .focused($focusedIndex, equals: index)
                             .onChange(of: focusedIndex) { old, new in
-                                // Validate when focus leaves this field
-                                if old == index, new != index {
-                                    clampThreshold(at: index)
-                                }
+                                if old == index, new != index { clampThreshold(at: index) }
                             }
+
+                        Button {
+                            stops[index].thresholdDisplay += stepSize
+                            clampThreshold(at: index)
+                        } label: {
+                            Image(systemName: "plus.circle")
+                                .foregroundStyle(ScanArtTheme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
 
                         Text(unitLabel)
                             .font(ScanArtTheme.body(13))
@@ -278,9 +296,6 @@ struct ColorPaletteEditorView: View {
     }
 
     private func formatted(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.maximumFractionDigits = value.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 1
-        formatter.minimumFractionDigits = 0
-        return formatter.string(from: NSNumber(value: value)) ?? "\(Int(value))"
+        String(format: "%.1f", value)
     }
 }
