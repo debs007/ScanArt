@@ -85,4 +85,11 @@ public final class MeshViewController: ObservableObject {
         self.renderer = renderer
         self.isOpaqueBackground = isOpaqueBackground
     }
+
+    /// Renders the current mesh off-screen at the given pixel size and returns
+    /// a `UIImage`. Delegates to `MeshRenderer.snapshot(width:height:)` — see
+    /// that method for implementation notes.
+    public func snapshot(width: Int = 1024, height: Int = 768) -> UIImage? {
+        renderer.snapshot(width: width, height: height)
+    }
 }

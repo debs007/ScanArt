@@ -14,6 +14,9 @@ public struct ReportContent {
     public let volumeCubicMeters: Double
     public let colorMapper: ThicknessColorMapper
     public let companyLogo: UIImage?
+    /// Colored-mesh snapshot captured from the Metal renderer — included as a
+    /// full-page "Thickness Map" page when provided.
+    public let meshSnapshot: UIImage?
     public let photos: [UIImage]
     public let signatureImage: UIImage?
 
@@ -24,6 +27,7 @@ public struct ReportContent {
         volumeCubicMeters: Double,
         colorMapper: ThicknessColorMapper,
         companyLogo: UIImage? = nil,
+        meshSnapshot: UIImage? = nil,
         photos: [UIImage] = [],
         signatureImage: UIImage? = nil
     ) {
@@ -33,6 +37,7 @@ public struct ReportContent {
         self.volumeCubicMeters = volumeCubicMeters
         self.colorMapper = colorMapper
         self.companyLogo = companyLogo
+        self.meshSnapshot = meshSnapshot
         self.photos = photos
         self.signatureImage = signatureImage
     }
@@ -53,7 +58,11 @@ public enum PDFReportGenerator {
         let data = renderer.pdfData { context in
             drawTitlePage(context: context, content: content)
             drawStatisticsPage(context: context, content: content)
-            drawLegendPage(context: context, content: content)
+            if content.meshSnapshot != nil {
+                drawMeshPage(context: context, content: content)
+            } else {
+                drawLegendPage(context: context, content: content)
+            }
             if !content.photos.isEmpty {
                 drawPhotosPage(context: context, content: content)
             }
@@ -99,6 +108,7 @@ public enum PDFReportGenerator {
             y = drawText("Notes", at: CGPoint(x: margin, y: y), font: .boldSystemFont(ofSize: 13), color: .black)
             y = drawWrappedText(content.project.notes, at: CGPoint(x: margin, y: y + 4), width: pageSize.width - margin * 2, font: .systemFont(ofSize: 11), color: .darkGray)
         }
+        _ = y
     }
 
     // MARK: - Page 2: Statistics
@@ -150,7 +160,53 @@ public enum PDFReportGenerator {
         UIBezierPath(rect: CGRect(origin: origin, size: size)).stroke()
     }
 
-    // MARK: - Page 3: Legend
+    // MARK: - Page 3 option A: Thickness Map (mesh screenshot + legend inline)
+
+    private static func drawMeshPage(context: UIGraphicsPDFRendererContext, content: ReportContent) {
+        guard let image = content.meshSnapshot else { return }
+        context.beginPage()
+        var y = margin
+
+        y = drawText("Thickness Map", at: CGPoint(x: margin, y: y),
+                     font: .boldSystemFont(ofSize: 20), color: .black)
+        y += 10
+
+        // Draw the mesh image full-width, preserving its 4:3 aspect ratio
+        let availableWidth = pageSize.width - margin * 2
+        let imageHeight = min(availableWidth * image.size.height / max(image.size.width, 1),
+                              pageSize.height * 0.55)  // cap at 55% of page height
+        image.draw(in: CGRect(x: margin, y: y, width: availableWidth, height: imageHeight))
+
+        // Thin border around the image
+        UIColor(white: 0.75, alpha: 1).setStroke()
+        UIBezierPath(rect: CGRect(x: margin, y: y, width: availableWidth, height: imageHeight)).stroke()
+        y += imageHeight + 20
+
+        // Color legend inline below the image
+        y = drawText("Color Legend", at: CGPoint(x: margin, y: y),
+                     font: .boldSystemFont(ofSize: 14), color: .black)
+        y += 8
+
+        let unit = content.project.unit
+        let swatchW: CGFloat = 20
+        let swatchH: CGFloat = 14
+        let cols = 2
+        let colWidth = availableWidth / CGFloat(cols)
+        for (i, stop) in content.colorMapper.stops.enumerated() {
+            let col = CGFloat(i % cols)
+            let row = CGFloat(i / cols)
+            let ox = margin + col * colWidth
+            let oy = y + row * 22
+            let swatchRect = CGRect(x: ox, y: oy, width: swatchW, height: swatchH)
+            UIColor(red: stop.color.r, green: stop.color.g, blue: stop.color.b, alpha: 1).setFill()
+            UIBezierPath(roundedRect: swatchRect, cornerRadius: 2).fill()
+            _ = drawText("\(stop.label) — \(unit.format(mm: stop.thicknessMM))",
+                         at: CGPoint(x: ox + swatchW + 6, y: oy),
+                         font: .systemFont(ofSize: 11), color: .black)
+        }
+    }
+
+    // MARK: - Page 3 option B: Legend only (no mesh snapshot available)
 
     private static func drawLegendPage(context: UIGraphicsPDFRendererContext, content: ReportContent) {
         context.beginPage()
@@ -168,7 +224,7 @@ public enum PDFReportGenerator {
         }
     }
 
-    // MARK: - Page 4: Photos (optional)
+    // MARK: - Photos page (optional project photos)
 
     private static func drawPhotosPage(context: UIGraphicsPDFRendererContext, content: ReportContent) {
         context.beginPage()

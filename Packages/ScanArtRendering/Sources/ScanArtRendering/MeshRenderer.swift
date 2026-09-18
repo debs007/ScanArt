@@ -169,6 +169,97 @@ public final class MeshRenderer: NSObject {
         indexBuffer = device.makeBuffer(bytes: indices, length: indices.count * MemoryLayout<UInt32>.stride, options: .storageModeShared)
         indexCount = indices.count
     }
+
+    // MARK: - Offscreen snapshot
+
+    /// Renders the current mesh at the requested pixel size off-screen and returns
+    /// a `UIImage`. Uses the same pipeline, camera, and vertex colors as the live
+    /// view so the snapshot matches exactly what the user sees. Safe to call from
+    /// the main thread; `waitUntilCompleted` returns in milliseconds for a single
+    /// draw call with already-uploaded GPU buffers.
+    public func snapshot(width: Int = 1024, height: Int = 768) -> UIImage? {
+        guard let vertexBuffer, let indexBuffer, indexCount > 0 else { return nil }
+
+        // Color attachment — shared storage so the CPU can read pixels back
+        let colorDesc = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
+        colorDesc.usage = [.renderTarget, .shaderRead]
+        colorDesc.storageMode = .shared
+        guard let colorTex = device.makeTexture(descriptor: colorDesc) else { return nil }
+
+        // Depth attachment — private, only used during rendering
+        let depthDesc = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .depth32Float, width: width, height: height, mipmapped: false)
+        depthDesc.usage = .renderTarget
+        depthDesc.storageMode = .private
+        guard let depthTex = device.makeTexture(descriptor: depthDesc) else { return nil }
+
+        let passDesc = MTLRenderPassDescriptor()
+        passDesc.colorAttachments[0].texture = colorTex
+        passDesc.colorAttachments[0].loadAction = .clear
+        passDesc.colorAttachments[0].storeAction = .store
+        passDesc.colorAttachments[0].clearColor = MTLClearColorMake(0.10, 0.11, 0.13, 1.0)
+        passDesc.depthAttachment.texture = depthTex
+        passDesc.depthAttachment.loadAction = .clear
+        passDesc.depthAttachment.storeAction = .dontCare
+        passDesc.depthAttachment.clearDepth = 1.0
+
+        guard let commandBuffer = commandQueue.makeCommandBuffer(),
+              let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDesc)
+        else { return nil }
+
+        let aspect = Float(width) / Float(max(height, 1))
+        var uniforms = Uniforms(
+            modelMatrix: .identity,
+            viewMatrix: camera.viewMatrix(),
+            projectionMatrix: camera.projectionMatrix(aspect: aspect),
+            lightDirection: normalize(SIMD3<Float>(-0.4, -1.0, -0.3)),
+            opacity: opacity
+        )
+
+        encoder.setDepthStencilState(depthState)
+        encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
+        encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
+
+        if renderStyle != .wireframe, let solidPipeline {
+            encoder.setRenderPipelineState(solidPipeline)
+            encoder.setTriangleFillMode(.fill)
+            encoder.drawIndexedPrimitives(type: .triangle, indexCount: indexCount,
+                                          indexType: .uint32, indexBuffer: indexBuffer, indexBufferOffset: 0)
+        }
+        if renderStyle != .solid, let wireframePipeline {
+            encoder.setRenderPipelineState(wireframePipeline)
+            encoder.setTriangleFillMode(.lines)
+            encoder.drawIndexedPrimitives(type: .triangle, indexCount: indexCount,
+                                          indexType: .uint32, indexBuffer: indexBuffer, indexBufferOffset: 0)
+        }
+
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+
+        // Read BGRA pixels from shared-storage texture
+        let bytesPerRow = width * 4
+        var bytes = [UInt8](repeating: 0, count: bytesPerRow * height)
+        colorTex.getBytes(&bytes, bytesPerRow: bytesPerRow,
+                          from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+
+        // byteOrder32Little + premultipliedFirst → in-memory byte order matches bgra8Unorm
+        let bitmapInfo = CGBitmapInfo(rawValue:
+            CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
+        guard let provider = CGDataProvider(data: Data(bytes) as CFData),
+              let cgImage = CGImage(
+                width: width, height: height,
+                bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: bytesPerRow,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: bitmapInfo,
+                provider: provider, decode: nil,
+                shouldInterpolate: true, intent: .defaultIntent)
+        else { return nil }
+
+        return UIImage(cgImage: cgImage)
+    }
 }
 
 extension MeshRenderer: MTKViewDelegate {

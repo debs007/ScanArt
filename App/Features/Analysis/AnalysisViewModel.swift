@@ -278,12 +278,17 @@ final class AnalysisViewModel: ObservableObject {
             let fileName = "\(sanitizedFileName(project.name))_Report_\(reportID.uuidString.prefix(8)).pdf"
             let url = reportsFolder.appendingPathComponent(fileName)
 
+            // Capture the current Metal view at report resolution (4:3, ~200dpi
+            // equivalent for a full-page image on US Letter).
+            let meshSnapshot = meshViewController.snapshot(width: 1200, height: 900)
+
             let content = ReportContent(
                 project: project,
                 scan: scan,
                 statistics: statistics,
                 volumeCubicMeters: volumeCubicMeters,
-                colorMapper: colorMapper
+                colorMapper: colorMapper,
+                meshSnapshot: meshSnapshot
             )
             try PDFReportGenerator.generate(content, to: url)
 
