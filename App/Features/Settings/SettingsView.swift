@@ -5,7 +5,7 @@ import ScanArtUI
 
 struct SettingsView: View {
     @AppStorage("scanart.defaultUnit") private var defaultUnitRawValue: String = MeasurementUnit.centimeters.rawValue
-    @AppStorage("scanart.language") private var selectedLanguage: String = "en"
+    @Environment(LocalizationManager.self) private var l10n
     @State private var availableStorageMB: Double?
 
     private var defaultUnit: Binding<MeasurementUnit> {
@@ -17,47 +17,49 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Defaults") {
-                Picker("Default Unit", selection: defaultUnit) {
+            Section(l10n("settings.defaults")) {
+                Picker(l10n("settings.defaultUnit"), selection: defaultUnit) {
                     ForEach(MeasurementUnit.allCases) { Text($0.displayName).tag($0) }
                 }
-                Text("Used to pre-fill new projects. Each project can still use its own unit.")
+                Text(l10n("settings.defaultUnitNote"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Language") {
-                Picker("Language", selection: $selectedLanguage) {
-                    Text("English").tag("en")
-                    Text("Español").tag("es")
+            Section(l10n("settings.language")) {
+                Picker(l10n("settings.language"), selection: Binding(
+                    get: { l10n.language },
+                    set: { l10n.setLanguage($0) }
+                )) {
+                    Text(l10n("settings.language.en")).tag("en")
+                    Text(l10n("settings.language.es")).tag("es")
                 }
-                Text("Language change takes effect after restarting the app.")
+                .pickerStyle(.segmented)
+                Text(l10n("settings.language.note"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            .onChange(of: selectedLanguage) { _, newLang in
-                UserDefaults.standard.set([newLang], forKey: "AppleLanguages")
-                UserDefaults.standard.synchronize()
-            }
 
-            Section("Storage") {
-                LabeledContent("Available Space") {
+            Section(l10n("settings.storage")) {
+                LabeledContent(l10n("settings.availableSpace")) {
                     if let availableStorageMB {
-                        Text(availableStorageMB > 1024 ? String(format: "%.1f GB", availableStorageMB / 1024) : String(format: "%.0f MB", availableStorageMB))
+                        Text(availableStorageMB > 1024
+                             ? String(format: "%.1f GB", availableStorageMB / 1024)
+                             : String(format: "%.0f MB", availableStorageMB))
                     } else {
                         Text("—")
                     }
                 }
-                Text("Scan Art stores all projects, scans, and reports locally on this device — nothing is uploaded.")
+                Text(l10n("settings.storageNote"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                LabeledContent("Version", value: appVersionString)
+                LabeledContent(l10n("settings.version"), value: appVersionString)
             }
         }
-        .navigationTitle("Settings")
+        .navigationTitle(l10n("settings.title"))
         .navigationBarTitleDisplayMode(.inline)
         .task { loadStorage() }
     }

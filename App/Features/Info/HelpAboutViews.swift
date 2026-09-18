@@ -2,47 +2,49 @@ import SwiftUI
 import ScanArtUI
 
 struct HelpView: View {
+    @Environment(LocalizationManager.self) private var l10n
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ScanArtTheme.spacingL) {
                 helpSection(
-                    title: "1. Create a Project",
+                    title: l10n("help.1.title"),
                     icon: "folder.badge.plus",
-                    text: "Set the desired plaster thickness and tolerance for the wall you're measuring. This drives the color legend and pass/fail statistics."
+                    text: l10n("help.1.text")
                 )
                 helpSection(
-                    title: "2. Original Scan",
+                    title: l10n("help.2.title"),
                     icon: "camera.metering.matrix",
-                    text: "Before plastering, scan the bare wall. Move slowly and cover the whole area, including a bit of floor, ceiling, or a doorway if visible — these help align future rescans."
+                    text: l10n("help.2.text")
                 )
                 helpSection(
-                    title: "3. Rescan After Plastering",
+                    title: l10n("help.3.title"),
                     icon: "arrow.triangle.2.circlepath.camera",
-                    text: "Once plaster is applied, start a rescan. Scan Art will try to relocalize to the exact position of the original scan — pan slowly around the room until alignment succeeds."
+                    text: l10n("help.3.text")
                 )
                 helpSection(
-                    title: "4. Generate Thickness Map",
+                    title: l10n("help.4.title"),
                     icon: "wand.and.rays",
-                    text: "In Analysis, tap Generate Thickness Map. Scan Art compares both scans and colors the wall by how much thicker it grew — green means on target."
+                    text: l10n("help.4.text")
                 )
                 helpSection(
-                    title: "5. Export & Report",
+                    title: l10n("help.5.title"),
                     icon: "square.and.arrow.up",
-                    text: "Export the colored mesh to DXF, OBJ, PLY, STL, USDZ, CSV, or JSON, or generate a PDF report to share with your client or team."
+                    text: l10n("help.5.text")
                 )
 
                 Divider().background(ScanArtTheme.surfaceBorder)
 
                 helpSection(
-                    title: "Tips for Best Results",
+                    title: l10n("help.tips.title"),
                     icon: "lightbulb.fill",
-                    text: "Scan in good, even lighting. Avoid scanning highly reflective or completely blank surfaces. Keep the device moving slowly and steadily — quick motions can lose tracking."
+                    text: l10n("help.tips.text")
                 )
             }
             .padding(ScanArtTheme.spacingL)
         }
         .scanArtScreenBackground()
-        .navigationTitle("Help")
+        .navigationTitle(l10n("help.title"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -61,6 +63,8 @@ struct HelpView: View {
 }
 
 struct AboutView: View {
+    @Environment(LocalizationManager.self) private var l10n
+
     var body: some View {
         ScrollView {
             VStack(spacing: ScanArtTheme.spacingL) {
@@ -69,19 +73,19 @@ struct AboutView: View {
                     .foregroundStyle(ScanArtTheme.accent)
                     .padding(.top, ScanArtTheme.spacingL)
 
-                Text("Scan Art").font(ScanArtTheme.numericDisplay(26)).foregroundStyle(ScanArtTheme.textPrimary)
+                Text(l10n("app.name")).font(ScanArtTheme.numericDisplay(26)).foregroundStyle(ScanArtTheme.textPrimary)
                 Text(appVersionString).font(ScanArtTheme.body(13)).foregroundStyle(ScanArtTheme.textSecondary)
 
-                Text("LiDAR-based plaster thickness measurement for civil engineers, architects, and contractors. Every scan, measurement, and report stays on this device — Scan Art works entirely offline.")
+                Text(l10n("about.subtitle"))
                     .font(ScanArtTheme.body(14))
                     .foregroundStyle(ScanArtTheme.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, ScanArtTheme.spacingL)
 
                 VStack(alignment: .leading, spacing: ScanArtTheme.spacingS) {
-                    aboutRow("Alignment", "ARKit world-map relocalization + ICP refinement")
-                    aboutRow("Measurement", "Ray-mesh intersection thickness sampling")
-                    aboutRow("Storage", "100% on-device, no account or cloud required")
+                    aboutRow(l10n("about.alignment"), l10n("about.alignment.value"))
+                    aboutRow(l10n("about.measurement"), l10n("about.measurement.value"))
+                    aboutRow(l10n("about.storage"), l10n("about.storage.value"))
                 }
                 .padding(ScanArtTheme.spacingM)
                 .glassPanel()
@@ -91,7 +95,7 @@ struct AboutView: View {
             .padding(.bottom, ScanArtTheme.spacingXL)
         }
         .scanArtScreenBackground()
-        .navigationTitle("About")
+        .navigationTitle(l10n("about.title"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -104,6 +108,6 @@ struct AboutView: View {
 
     private var appVersionString: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
-        return "Version \(version)"
+        return "\(l10n("settings.version")) \(version)"
     }
 }

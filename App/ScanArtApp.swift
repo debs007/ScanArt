@@ -9,6 +9,7 @@ struct ScanArtApp: App {
     private let diContainer: DIContainer?
     private let modelContainer: ModelContainer?
     private let bootstrapErrorMessage: String?
+    @State private var localizationManager = LocalizationManager()
 
     init() {
         do {
@@ -40,6 +41,7 @@ struct ScanArtApp: App {
                     StorageFailureView(message: bootstrapErrorMessage ?? "Unknown error")
                 }
             }
+            .environment(localizationManager)
             .preferredColorScheme(.dark)
         }
     }

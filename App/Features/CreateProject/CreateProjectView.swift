@@ -8,6 +8,7 @@ struct CreateProjectView: View {
 
     @Environment(\.diContainer) private var di
     @Environment(\.dismiss) private var dismiss
+    @Environment(LocalizationManager.self) private var l10n
 
     @State private var name = ""
     @State private var customerName = ""
@@ -45,7 +46,7 @@ struct CreateProjectView: View {
                                     Image(systemName: "photo.badge.plus")
                                         .font(.system(size: 28))
                                         .foregroundStyle(ScanArtTheme.accent)
-                                    Text("Add Photo")
+                                    Text(l10n("project.addPhoto"))
                                         .font(ScanArtTheme.body(12))
                                         .foregroundStyle(ScanArtTheme.accent)
                                 }
@@ -58,50 +59,50 @@ struct CreateProjectView: View {
                     }
                     .padding(.vertical, 4)
                     if thumbnailImage != nil {
-                        Button("Remove Photo", role: .destructive) {
+                        Button(l10n("project.removePhoto"), role: .destructive) {
                             thumbnailImage = nil
                             thumbnailItem = nil
                         }
                     }
-                } header: { Label("Project Photo", systemImage: "photo") }
+                } header: { Label(l10n("project.photo"), systemImage: "photo") }
 
                 // Project
                 Section {
                     iconRow("folder.fill", color: ScanArtTheme.accent) {
-                        TextField("Project name *", text: $name)
+                        TextField(l10n("project.name"), text: $name)
                             .autocorrectionDisabled()
                     }
                     iconRow("person.fill", color: .blue) {
-                        TextField("Customer name", text: $customerName)
+                        TextField(l10n("project.customer"), text: $customerName)
                     }
                     iconRow("person.badge.key.fill", color: .purple) {
-                        TextField("Engineer name", text: $engineerName)
+                        TextField(l10n("project.engineer"), text: $engineerName)
                     }
                 } header: {
-                    Label("Project", systemImage: "briefcase")
+                    Label(l10n("project.section"), systemImage: "briefcase")
                 }
 
-                // Work type + thickness (moved above Location per user request)
+                // Work type + thickness
                 Section {
                     Picker(selection: $projectType) {
                         ForEach(ProjectType.allCases) { type in
                             Text(type.displayName).tag(type)
                         }
                     } label: {
-                        Label("Work Type", systemImage: "paintbrush.pointed.fill")
+                        Label(l10n("project.workType"), systemImage: "paintbrush.pointed.fill")
                     }
                     .pickerStyle(.navigationLink)
 
                     Picker(selection: $unit) {
                         ForEach(MeasurementUnit.allCases) { Text($0.displayName).tag($0) }
                     } label: {
-                        Label("Unit", systemImage: "ruler")
+                        Label(l10n("project.unit"), systemImage: "ruler")
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Label(
-                                "Target \(projectType.thicknessLabel.lowercased())",
+                                "\(l10n("project.targetThickness")) (\(projectType.thicknessLabel.lowercased()))",
                                 systemImage: "arrow.up.and.down"
                             )
                             .foregroundStyle(.primary)
@@ -118,7 +119,7 @@ struct CreateProjectView: View {
 
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Label("Tolerance (±)", systemImage: "plusminus")
+                            Label(l10n("project.tolerance"), systemImage: "plusminus")
                                 .foregroundStyle(.primary)
                             Spacer()
                             Text(toleranceDisplay)
@@ -128,16 +129,15 @@ struct CreateProjectView: View {
                         }
                         Slider(value: $tolerance, in: toleranceRange, step: toleranceStep)
                             .tint(.orange)
-                        // Recommended tolerance hint (5 % of target thickness)
                         HStack(spacing: 6) {
                             Image(systemName: "lightbulb.fill")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.orange.opacity(0.7))
-                            Text("Recommended: \(recommendedToleranceDisplay)")
+                            Text("\(l10n("project.recommended")) \(recommendedToleranceDisplay)")
                                 .font(ScanArtTheme.body(11))
                                 .foregroundStyle(ScanArtTheme.textTertiary)
                             if abs(tolerance - recommendedTolerance) > toleranceStep * 0.4 {
-                                Button("Use") { tolerance = recommendedTolerance }
+                                Button(l10n("action.use")) { tolerance = recommendedTolerance }
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(ScanArtTheme.accent)
                             }
@@ -152,26 +152,26 @@ struct CreateProjectView: View {
                 // Location
                 Section {
                     iconRow("mappin.circle.fill", color: .red) {
-                        TextField("Site", text: $siteName)
+                        TextField(l10n("project.site"), text: $siteName)
                     }
                     iconRow("building.2.fill", color: .orange) {
-                        TextField("Building", text: $buildingName)
+                        TextField(l10n("project.building"), text: $buildingName)
                     }
                     iconRow("door.left.hand.open", color: .teal) {
-                        TextField("Room", text: $roomName)
+                        TextField(l10n("project.room"), text: $roomName)
                     }
                     iconRow("square.stack.fill", color: .indigo) {
-                        TextField("Floor number", text: $floorNumber)
+                        TextField(l10n("project.floor"), text: $floorNumber)
                             .keyboardType(.numberPad)
                     }
                 } header: {
-                    Label("Location", systemImage: "location")
+                    Label(l10n("project.location"), systemImage: "location")
                 }
 
                 Section {
                     TextEditor(text: $notes).frame(minHeight: 80)
                 } header: {
-                    Label("Notes", systemImage: "note.text")
+                    Label(l10n("project.notes"), systemImage: "note.text")
                 }
 
                 if let errorMessage {
@@ -202,14 +202,14 @@ struct CreateProjectView: View {
                 // Auto-sync tolerance to 5 % of new target thickness
                 tolerance = recommendedTolerance
             }
-            .navigationTitle("New Project")
+            .navigationTitle(l10n("project.new"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(l10n("action.cancel")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") { create() }
+                    Button(l10n("action.create")) { create() }
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }

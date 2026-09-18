@@ -6,6 +6,7 @@ struct ProjectDetailView: View {
     let projectID: UUID
     @Binding var path: NavigationPath
     @Environment(\.diContainer) private var di
+    @Environment(LocalizationManager.self) private var l10n
 
     @State private var project: Project?
     @State private var errorMessage: String?
@@ -20,14 +21,14 @@ struct ProjectDetailView: View {
                     summaryCard(for: project)
 
                     if project.originalScan == nil {
-                        PrimaryButton("Start Original Scan", systemImage: "camera.metering.matrix") {
+                        PrimaryButton(l10n("detail.startOriginalScan"), systemImage: "camera.metering.matrix") {
                             path.append(AppRoute.scan(projectID: project.id))
                         }
                     } else {
-                        PrimaryButton("New Rescan", systemImage: "arrow.triangle.2.circlepath.camera") {
+                        PrimaryButton(l10n("detail.newRescan"), systemImage: "arrow.triangle.2.circlepath.camera") {
                             path.append(AppRoute.rescan(projectID: project.id))
                         }
-                        SecondaryButton("Reports", systemImage: "doc.text") {
+                        SecondaryButton(l10n("detail.reports"), systemImage: "doc.text") {
                             path.append(AppRoute.reports(projectID: project.id))
                         }
                     }
@@ -42,7 +43,7 @@ struct ProjectDetailView: View {
             }
         }
         .scanArtScreenBackground()
-        .navigationTitle(project?.name ?? "Project")
+        .navigationTitle(project?.name ?? l10n("project.section"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -58,9 +59,9 @@ struct ProjectDetailView: View {
                 }
             }
         }
-        .confirmationDialog("Delete this project? This removes all scans and reports.", isPresented: $isShowingDeleteConfirmation, titleVisibility: .visible) {
-            Button("Delete Project", role: .destructive) { deleteProject() }
-            Button("Cancel", role: .cancel) {}
+        .confirmationDialog(l10n("project.deleteConfirm"), isPresented: $isShowingDeleteConfirmation, titleVisibility: .visible) {
+            Button(l10n("project.deleteTitle"), role: .destructive) { deleteProject() }
+            Button(l10n("action.cancel"), role: .cancel) {}
         }
         .task { load() }
         .onAppear { load() }
@@ -77,7 +78,6 @@ struct ProjectDetailView: View {
             isEditingColors = true
         } label: {
             HStack(spacing: ScanArtTheme.spacingM) {
-                // Mini gradient swatch
                 let stops = project.colorMapper().stops
                 LinearGradient(
                     colors: stops.map { Color(red: $0.color.r, green: $0.color.g, blue: $0.color.b) },
@@ -87,14 +87,14 @@ struct ProjectDetailView: View {
                 .frame(width: 36, height: 22)
                 .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
 
-                Text("Color Palette")
+                Text(l10n("detail.colorPalette"))
                     .font(ScanArtTheme.body(16))
                     .foregroundStyle(ScanArtTheme.textPrimary)
 
                 Spacer()
 
                 if project.hasCustomColors {
-                    Text("Custom")
+                    Text(l10n("detail.colorPalette.custom"))
                         .font(ScanArtTheme.label())
                         .foregroundStyle(ScanArtTheme.accent)
                 }
@@ -116,8 +116,8 @@ struct ProjectDetailView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: ScanArtTheme.spacingS) {
                 HStack {
-                    StatCard(label: "Desired", value: project.unit.format(mm: project.desiredThicknessMM))
-                    StatCard(label: "Tolerance", value: "± " + project.unit.format(mm: project.toleranceMM))
+                    StatCard(label: l10n("detail.desired"), value: project.unit.format(mm: project.desiredThicknessMM))
+                    StatCard(label: l10n("detail.tolerance"), value: "± " + project.unit.format(mm: project.toleranceMM))
                 }
                 if !project.customerName.isEmpty {
                     Label(project.customerName, systemImage: "person.fill").font(ScanArtTheme.body(13)).foregroundStyle(ScanArtTheme.textSecondary)
@@ -132,7 +132,7 @@ struct ProjectDetailView: View {
 
     private func timeline(for project: Project) -> some View {
         VStack(alignment: .leading, spacing: ScanArtTheme.spacingS) {
-            Text("TIMELINE").font(ScanArtTheme.label()).foregroundStyle(ScanArtTheme.textTertiary)
+            Text(l10n("detail.timeline")).font(ScanArtTheme.label()).foregroundStyle(ScanArtTheme.textTertiary)
 
             if let original = project.originalScan {
                 scanCard(original, project: project)
@@ -155,7 +155,7 @@ struct ProjectDetailView: View {
                     .frame(width: 10, height: 10)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(scan.displayName).font(ScanArtTheme.body(15)).foregroundStyle(ScanArtTheme.textPrimary)
-                    Text("\(scan.vertexCount) vertices · \(Int(scan.coveragePercent))% coverage")
+                    Text("\(scan.vertexCount) \(l10n("detail.vertices")) · \(Int(scan.coveragePercent))% \(l10n("detail.coverage"))")
                         .font(ScanArtTheme.body(12))
                         .foregroundStyle(ScanArtTheme.textSecondary)
                 }
@@ -163,7 +163,7 @@ struct ProjectDetailView: View {
                 if !scan.thicknessResults.isEmpty {
                     Image(systemName: "chart.bar.fill").foregroundStyle(ScanArtTheme.accent)
                 } else if scan.scanType == .rescan {
-                    Text("Tap to analyze").font(ScanArtTheme.body(11)).foregroundStyle(ScanArtTheme.textTertiary)
+                    Text(l10n("detail.tapToAnalyze")).font(ScanArtTheme.body(11)).foregroundStyle(ScanArtTheme.textTertiary)
                 }
             }
             .padding(ScanArtTheme.spacingM)

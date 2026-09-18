@@ -9,6 +9,7 @@ struct ScanView: View {
     let projectID: UUID
     @Binding var path: NavigationPath
     @Environment(\.diContainer) private var di
+    @Environment(LocalizationManager.self) private var l10n
 
     @StateObject private var viewModel = ScanViewModelBox()
     @State private var isShowingFinishSheet = false
@@ -84,10 +85,10 @@ struct ScanView: View {
         VStack(spacing: ScanArtTheme.spacingS) {
             trackingBanner(vm: vm)
             HStack(spacing: ScanArtTheme.spacingS) {
-                StatCard(label: "Mesh", value: "\(vm.sessionManager.meshAnchorCount)", unit: "anchors")
-                StatCard(label: "Coverage", value: "\(Int(vm.sessionManager.estimatedCoveragePercent))", unit: "%")
+                StatCard(label: l10n("scan.mesh"), value: "\(vm.sessionManager.meshAnchorCount)", unit: l10n("scan.anchors"))
+                StatCard(label: l10n("scan.coverage"), value: "\(Int(vm.sessionManager.estimatedCoveragePercent))", unit: "%")
             }
-            PrimaryButton("Finish Scan", systemImage: "checkmark.circle.fill", isEnabled: vm.canFinish) {
+            PrimaryButton(l10n("scan.finish"), systemImage: "checkmark.circle.fill", isEnabled: vm.canFinish) {
                 isShowingFinishSheet = true
             }
         }
@@ -107,11 +108,11 @@ struct ScanView: View {
 
     private func trackingMessage(for reason: ARCamera.TrackingState.Reason) -> String {
         switch reason {
-        case .initializing: return "Move the device slowly to begin tracking…"
-        case .excessiveMotion: return "Moving too fast — slow down."
-        case .insufficientFeatures: return "Point at a more textured surface."
-        case .relocalizing: return "Finding your position…"
-        @unknown default: return "Tracking is limited."
+        case .initializing:        return l10n("scan.tracking.initializing")
+        case .excessiveMotion:     return l10n("scan.tracking.excessiveMotion")
+        case .insufficientFeatures: return l10n("scan.tracking.insufficientFeatures")
+        case .relocalizing:        return l10n("scan.tracking.relocalizing")
+        @unknown default:          return l10n("scan.tracking.limited")
         }
     }
 
@@ -130,18 +131,18 @@ struct ScanView: View {
     private var finishSheet: some View {
         NavigationStack {
             Form {
-                Section("Label (optional)") {
-                    TextField("e.g. Original Scan", text: $scanLabel)
+                Section(l10n("scan.label.optional")) {
+                    TextField(l10n("scan.label.placeholder"), text: $scanLabel)
                 }
             }
-            .navigationTitle("Save Scan")
+            .navigationTitle(l10n("scan.save"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { isShowingFinishSheet = false }
+                    Button(l10n("action.cancel")) { isShowingFinishSheet = false }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(viewModel.vm?.isSaving == true ? "Saving…" : "Save") {
+                    Button(viewModel.vm?.isSaving == true ? l10n("action.saving") : l10n("action.save")) {
                         Task {
                             await viewModel.vm?.finishAndSave(label: scanLabel)
                             isShowingFinishSheet = false

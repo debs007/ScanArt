@@ -6,6 +6,7 @@ struct ProjectListView: View {
     @Binding var path: NavigationPath
     @Binding var isCreatingProject: Bool
     @Environment(\.diContainer) private var di
+    @Environment(LocalizationManager.self) private var l10n
 
     @State private var projects: [Project] = []
     @State private var searchText = ""
@@ -30,8 +31,8 @@ struct ProjectListView: View {
             .padding(ScanArtTheme.spacingM)
         }
         .scanArtScreenBackground()
-        .navigationTitle("Projects")
-        .searchable(text: $searchText, prompt: "Search by name, customer, site, engineer")
+        .navigationTitle(l10n("projects.title"))
+        .searchable(text: $searchText, prompt: l10n("projects.search"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -51,7 +52,7 @@ struct ProjectListView: View {
             Image(systemName: "square.stack.3d.up.slash")
                 .font(.system(size: 40))
                 .foregroundStyle(ScanArtTheme.textTertiary)
-            Text(searchText.isEmpty ? "No projects yet" : "No matching projects")
+            Text(searchText.isEmpty ? l10n("projects.empty") : l10n("projects.emptySearch"))
                 .font(ScanArtTheme.body(15))
                 .foregroundStyle(ScanArtTheme.textSecondary)
         }

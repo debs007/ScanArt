@@ -26,6 +26,7 @@
 		B6FB8B1F966BABE83AB0A296 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4217A35BB5D67DC6E80A791C /* HomeView.swift */; };
 		C424B46D97F5930B7DB3C6C7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5B3C374D194067412E3115C /* SettingsView.swift */; };
 		D4E6A1411476F36C6AADE807 /* AnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A456C77FC0134EB81C8DD2A3 /* AnalysisView.swift */; };
+		D76BA347305DD9F900322005 /* LocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76BA346305DD9F900322005 /* LocalizationManager.swift */; };
 		D79300A53026F8F200F7F855 /* RemoteControlSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300A43026F8F200F7F855 /* RemoteControlSession.swift */; };
 		D79300A73026F90600F7F855 /* RemoteControlHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300A63026F90600F7F855 /* RemoteControlHubView.swift */; };
 		D79300AB3026F94200F7F855 /* ControllerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79300AA3026F94200F7F855 /* ControllerView.swift */; };
@@ -58,6 +59,7 @@
 		AAC164351DCB450F30024376 /* ScanArtPersistence */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ScanArtPersistence; path = Packages/ScanArtPersistence; sourceTree = SOURCE_ROOT; };
 		CB6B685240C721ECB73A97C0 /* ProjectDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDetailView.swift; sourceTree = "<group>"; };
 		CF73746754D1C298442487C3 /* HelpAboutViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpAboutViews.swift; sourceTree = "<group>"; };
+		D76BA346305DD9F900322005 /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManager.swift; sourceTree = "<group>"; };
 		D79300A43026F8F200F7F855 /* RemoteControlSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlSession.swift; sourceTree = "<group>"; };
 		D79300A63026F90600F7F855 /* RemoteControlHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlHubView.swift; sourceTree = "<group>"; };
 		D79300AA3026F94200F7F855 /* ControllerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControllerView.swift; sourceTree = "<group>"; };
@@ -158,6 +160,7 @@
 				E59CDDD930F44CC2116758F7 /* Features */,
 				D79300B03027060500F7F855 /* Assets 2.xcassets */,
 				D79300B13027061D00F7F855 /* Assets 3.xcassets */,
+				D76BA346305DD9F900322005 /* LocalizationManager.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -350,6 +353,7 @@
 				D79300B53029F3B600F7F855 /* EditProjectView.swift in Sources */,
 				DB665F4002DCC0CFDDADAFE1 /* RescanViewModel.swift in Sources */,
 				57B61F78A02A0766BDCA38C1 /* RootView.swift in Sources */,
+				D76BA347305DD9F900322005 /* LocalizationManager.swift in Sources */,
 				95BBEBBF06F3E3CA8EDB3A42 /* ScanArtApp.swift in Sources */,
 				129E3F46B9F7D5B153A1E965 /* ScanView.swift in Sources */,
 				D79300AB3026F94200F7F855 /* ControllerView.swift in Sources */,

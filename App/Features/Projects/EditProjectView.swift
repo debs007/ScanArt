@@ -9,6 +9,7 @@ struct EditProjectView: View {
 
     @Environment(\.diContainer) private var di
     @Environment(\.dismiss) private var dismiss
+    @Environment(LocalizationManager.self) private var l10n
 
     @State private var name: String
     @State private var customerName: String
@@ -55,44 +56,44 @@ struct EditProjectView: View {
 
                 Section {
                     iconRow("folder.fill", color: ScanArtTheme.accent) {
-                        TextField("Project name *", text: $name).autocorrectionDisabled()
+                        TextField(l10n("project.name"), text: $name).autocorrectionDisabled()
                     }
                     iconRow("person.fill", color: .blue) {
-                        TextField("Customer name", text: $customerName)
+                        TextField(l10n("project.customer"), text: $customerName)
                     }
                     iconRow("person.badge.key.fill", color: .purple) {
-                        TextField("Engineer name", text: $engineerName)
+                        TextField(l10n("project.engineer"), text: $engineerName)
                     }
-                } header: { Label("Project", systemImage: "briefcase") }
+                } header: { Label(l10n("project.section"), systemImage: "briefcase") }
 
                 Section {
                     iconRow("mappin.circle.fill", color: .red) {
-                        TextField("Site", text: $siteName)
+                        TextField(l10n("project.site"), text: $siteName)
                     }
                     iconRow("building.2.fill", color: .orange) {
-                        TextField("Building", text: $buildingName)
+                        TextField(l10n("project.building"), text: $buildingName)
                     }
                     iconRow("door.left.hand.open", color: .teal) {
-                        TextField("Room", text: $roomName)
+                        TextField(l10n("project.room"), text: $roomName)
                     }
                     iconRow("square.stack.fill", color: .indigo) {
-                        TextField("Floor number", text: $floorNumber).keyboardType(.numberPad)
+                        TextField(l10n("project.floor"), text: $floorNumber).keyboardType(.numberPad)
                     }
-                } header: { Label("Location", systemImage: "location") }
+                } header: { Label(l10n("project.location"), systemImage: "location") }
 
                 Section {
                     Picker(selection: $projectType) {
                         ForEach(ProjectType.allCases) { Text($0.displayName).tag($0) }
-                    } label: { Label("Work Type", systemImage: "paintbrush.pointed.fill") }
+                    } label: { Label(l10n("project.workType"), systemImage: "paintbrush.pointed.fill") }
                     .pickerStyle(.navigationLink)
 
                     Picker(selection: $unit) {
                         ForEach(MeasurementUnit.allCases) { Text($0.displayName).tag($0) }
-                    } label: { Label("Unit", systemImage: "ruler") }
+                    } label: { Label(l10n("project.unit"), systemImage: "ruler") }
 
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Label("Target \(projectType.thicknessLabel.lowercased())", systemImage: "arrow.up.and.down")
+                            Label("\(l10n("project.targetThickness")) (\(projectType.thicknessLabel.lowercased()))", systemImage: "arrow.up.and.down")
                                 .foregroundStyle(.primary)
                             Spacer()
                             Text(thicknessDisplay)
@@ -106,7 +107,7 @@ struct EditProjectView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Label("Tolerance (±)", systemImage: "plusminus").foregroundStyle(.primary)
+                            Label(l10n("project.tolerance"), systemImage: "plusminus").foregroundStyle(.primary)
                             Spacer()
                             Text(toleranceDisplay)
                                 .foregroundStyle(.orange)
@@ -119,12 +120,12 @@ struct EditProjectView: View {
 
                 Section {
                     TextEditor(text: $notes).frame(minHeight: 80)
-                } header: { Label("Notes", systemImage: "note.text") }
+                } header: { Label(l10n("project.notes"), systemImage: "note.text") }
 
                 if !project.scans.isEmpty {
                     Section {
                         Label(
-                            "Saving will permanently delete \(project.scans.count) scan(s) and all thickness results.",
+                            String(format: l10n("project.deleteScansWarning"), project.scans.count),
                             systemImage: "exclamationmark.triangle.fill"
                         )
                         .foregroundStyle(.orange)
@@ -155,12 +156,12 @@ struct EditProjectView: View {
                     }
                 }
             }
-            .navigationTitle("Edit Project")
+            .navigationTitle(l10n("project.edit"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(l10n("action.cancel")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button(l10n("action.save")) {
                         if project.scans.isEmpty {
                             saveProject()
                         } else {
@@ -171,14 +172,14 @@ struct EditProjectView: View {
                 }
             }
             .confirmationDialog(
-                "Delete all scan data?",
+                l10n("project.deleteScansTitle"),
                 isPresented: $showClearConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Delete Scans & Save", role: .destructive) { saveProject() }
-                Button("Cancel", role: .cancel) {}
+                Button(l10n("project.deleteScansAndSave"), role: .destructive) { saveProject() }
+                Button(l10n("action.cancel"), role: .cancel) {}
             } message: {
-                Text("Saving will permanently delete all original scans, rescans, and thickness analysis results for this project.")
+                Text(l10n("project.deleteScansMessage"))
             }
         }
     }
@@ -196,13 +197,13 @@ struct EditProjectView: View {
             }
             .padding(.vertical, 4)
             if thumbnailImage != nil || (project.thumbnailFileName != nil && !shouldRemoveThumbnail) {
-                Button("Remove Photo", role: .destructive) {
+                Button(l10n("project.removePhoto"), role: .destructive) {
                     thumbnailImage = nil
                     thumbnailItem = nil
                     shouldRemoveThumbnail = true
                 }
             }
-        } header: { Label("Project Photo", systemImage: "photo") }
+        } header: { Label(l10n("project.photo"), systemImage: "photo") }
     }
 
     @ViewBuilder
@@ -233,7 +234,7 @@ struct EditProjectView: View {
             Image(systemName: "photo.badge.plus")
                 .font(.system(size: 28))
                 .foregroundStyle(ScanArtTheme.accent)
-            Text("Add Photo")
+            Text(l10n("project.addPhoto"))
                 .font(ScanArtTheme.body(12))
                 .foregroundStyle(ScanArtTheme.accent)
         }

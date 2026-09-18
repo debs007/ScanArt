@@ -6,7 +6,7 @@ import CoreImage
 import UIKit
 import Observation
 
-/// Normalized tap event sent from controller → broadcaster.
+/// Normalized tap / drag event sent from controller → broadcaster.
 struct RemoteTouchEvent: Codable {
     enum Kind: String, Codable { case tap, touchBegan, touchMoved, touchEnded }
     let kind: Kind
@@ -30,29 +30,28 @@ final class RemoteControlSession: NSObject {
     private(set) var latestFrame: UIImage?
     private(set) var touchEventID: Int = 0
     private(set) var lastRemoteTouch: RemoteTouchEvent?
+    // Set when a text-input event is received — controller observes this to dismiss its keyboard sheet.
+    private(set) var isConnecting = false
 
     private static let serviceType = "scanart-remote"
     private let myPeerID: MCPeerID
     private var mcSession: MCSession?
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
-    // CIImage handles any pixel format RPScreenRecorder may deliver (BGRA, YUV, IOSurface-backed)
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
-    // Prevents frame queue buildup: if encoding is in progress, new frames are dropped
     private let encodeLock = NSLock()
     private var lastFrameTime: Double = 0
-    // Tracks last touch position for computing scroll deltas from touchMoved events
     private var previousTouchPoint: CGPoint?
-    // Tracks a UISlider the remote finger is dragging so we can map x-position to value
     private weak var trackedSlider: UISlider?
-    // Thread-safe mirror of connectedPeers for the capture background thread.
-    // capturePeers is written on the main thread (under lock) and read on the
-    // capture thread (under lock) so frames are sent without a main-thread dispatch.
     private let capturePeersLock = NSLock()
     private var capturePeers: [MCPeerID] = []
+    // Tracks peers for which an invitation has been sent but not yet resolved —
+    // prevents duplicate invitations when the user taps a peer more than once.
+    private var pendingInvitePeers: Set<String> = []
 
-    private static let frameMarker = UInt8(0x01)
-    private static let touchMarker = UInt8(0x02)
+    private static let frameMarker     = UInt8(0x01)
+    private static let touchMarker     = UInt8(0x02)
+    private static let textInputMarker = UInt8(0x03)
 
     override init() {
         myPeerID = MCPeerID(displayName: UIDevice.current.name)
@@ -82,6 +81,7 @@ final class RemoteControlSession: NSObject {
         mcSession = nil
         connectedPeers = []
         capturePeersLock.lock(); capturePeers = []; capturePeersLock.unlock()
+        pendingInvitePeers = []
         role = nil
         captureError = nil
     }
@@ -99,14 +99,28 @@ final class RemoteControlSession: NSObject {
     }
 
     func connect(to peer: MCPeerID) {
-        guard let s = mcSession else { return }
-        browser?.invitePeer(peer, to: s, withContext: nil, timeout: 10)
+        guard let s = mcSession,
+              !connectedPeers.contains(peer),
+              !pendingInvitePeers.contains(peer.displayName) else { return }
+        pendingInvitePeers.insert(peer.displayName)
+        isConnecting = true
+        // 15-second timeout gives more headroom on congested networks.
+        browser?.invitePeer(peer, to: s, withContext: nil, timeout: 15)
     }
 
     func sendTouch(_ event: RemoteTouchEvent) {
         guard let s = mcSession, !connectedPeers.isEmpty,
               let payload = try? JSONEncoder().encode(event) else { return }
         var data = Data([Self.touchMarker])
+        data.append(payload)
+        try? s.send(data, toPeers: connectedPeers, with: .reliable)
+    }
+
+    /// Sends a UTF-8 string to the broadcaster to be typed into the focused text field.
+    func sendTextInput(_ text: String) {
+        guard let s = mcSession, !connectedPeers.isEmpty,
+              let payload = text.data(using: .utf8) else { return }
+        var data = Data([Self.textInputMarker])
         data.append(payload)
         try? s.send(data, toPeers: connectedPeers, with: .reliable)
     }
@@ -122,8 +136,10 @@ final class RemoteControlSession: NSObject {
         connectedPeers = []
         availablePeers = []
         capturePeersLock.lock(); capturePeers = []; capturePeersLock.unlock()
+        pendingInvitePeers = []
         isCaptureActive = false
         captureError = nil
+        isConnecting = false
         role = nil
     }
 
@@ -138,26 +154,18 @@ final class RemoteControlSession: NSObject {
     private func beginScreenCapture() {
         let recorder = RPScreenRecorder.shared()
         recorder.isMicrophoneEnabled = false
-        // Stop any leftover capture before starting fresh — startCapture silently fails
-        // if called while a previous session is still active.
         recorder.stopCapture { [weak self] _ in
             guard let self else { return }
             recorder.startCapture { [weak self] sampleBuffer, bufferType, error in
                 guard let self, bufferType == .video, error == nil,
                       let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-                // Hard cap at 15 fps — sending more than the pipe can carry just queues
-                // stale frames and increases latency without improving UX.
                 let now = CACurrentMediaTime()
                 guard now - self.lastFrameTime >= 0.067 else { return }
 
-                // Drop frame if previous encode is still running.
                 guard self.encodeLock.try() else { return }
                 self.lastFrameTime = now
 
-                // CIImage handles any format RPScreenRecorder may deliver (BGRA, YUV,
-                // IOSurface-backed). Scale to 320px wide before GPU→CPU readback so the
-                // readback is small and fast (~400 KB vs ~14 MB at full retina resolution).
                 let ci = CIImage(cvPixelBuffer: pixelBuffer)
                 let scale = min(1.0, 320.0 / ci.extent.width)
                 let scaledCI = scale < 1.0
@@ -168,9 +176,6 @@ final class RemoteControlSession: NSObject {
                     self.encodeLock.unlock()
                     return
                 }
-                // Unlock BEFORE send. mcSession.send with .unreliable can briefly stall when
-                // its output buffer is full — holding the lock through the send was blocking
-                // all new encodes and causing 10s+ frame gaps.
                 self.encodeLock.unlock()
 
                 var packet = Data([Self.frameMarker])
@@ -191,7 +196,7 @@ final class RemoteControlSession: NSObject {
 
 }
 
-// MARK: - Remote touch execution (broadcaster side)
+// MARK: - Remote touch + text execution (broadcaster side)
 
 extension RemoteControlSession {
 
@@ -212,7 +217,6 @@ extension RemoteControlSession {
         switch event.kind {
         case .touchBegan:
             previousTouchPoint = point
-            // Detect whether the finger landed on a UISlider so touchMoved can drag it
             trackedSlider = nil
             if let hitView = window.hitTest(point, with: nil) {
                 var v: UIView? = hitView
@@ -227,8 +231,6 @@ extension RemoteControlSession {
             let delta = CGPoint(x: point.x - prev.x, y: point.y - prev.y)
             previousTouchPoint = point
             if let slider = trackedSlider {
-                // Map absolute x position to a slider value using the track's real rect.
-                // UISlider.trackRect gives inset bounds inside the thumb hitbox padding.
                 let trackInSlider = slider.trackRect(forBounds: slider.bounds)
                 let trackInWindow = slider.convert(trackInSlider, to: window)
                 guard trackInWindow.width > 0 else { break }
@@ -252,8 +254,6 @@ extension RemoteControlSession {
             if let hitView = window.hitTest(point, with: nil) {
                 var responder: UIResponder? = hitView
                 while let r = responder {
-                    // Text inputs must becomeFirstResponder to show the keyboard —
-                    // sendActions(for: .touchUpInside) on UIControl won't do it.
                     if let tf = r as? UITextField { tf.becomeFirstResponder(); return }
                     if let tv = r as? UITextView  { tv.becomeFirstResponder(); return }
                     if let control = r as? UIControl {
@@ -263,12 +263,28 @@ extension RemoteControlSession {
                     responder = r.next
                 }
             }
-            // Accessibility element tree — reaches SwiftUI Buttons and TextFields
             activateElement(at: point, in: window)
         }
     }
 
-    /// Finds the nearest UIScrollView ancestor at `point` and adjusts its contentOffset by `delta`.
+    /// Inserts `text` into whichever text field currently holds first-responder focus.
+    private func insertTextIntoFirstResponder(_ text: String) {
+        guard let window = keyWindow() else { return }
+        guard let target = findFirstResponder(in: window) else { return }
+        if let keyInput = target as? UIKeyInput {
+            keyInput.insertText(text)
+        }
+    }
+
+    /// Depth-first search for the first-responder view in the hierarchy.
+    private func findFirstResponder(in view: UIView) -> UIView? {
+        if view.isFirstResponder { return view }
+        for sub in view.subviews {
+            if let found = findFirstResponder(in: sub) { return found }
+        }
+        return nil
+    }
+
     private func scrollIfPossible(at point: CGPoint, in window: UIWindow, delta: CGPoint) {
         guard let hitView = window.hitTest(point, with: nil) else { return }
         var current: UIView? = hitView
@@ -285,11 +301,8 @@ extension RemoteControlSession {
         }
     }
 
-    /// Recursively walks the accessibility element tree to find and activate the element
-    /// at `point` (screen coordinates). Works for SwiftUI Buttons and other accessible controls.
     @discardableResult
     private func activateElement(at point: CGPoint, in element: NSObject) -> Bool {
-        // Skip frame check for the root window — it covers the whole screen
         if !(element is UIWindow) {
             guard element.accessibilityFrame.contains(point) else { return false }
             let activatable: UIAccessibilityTraits = [.button, .link, .adjustable]
@@ -298,11 +311,9 @@ extension RemoteControlSession {
                 return true
             }
         }
-        // Recurse into virtual accessibility children (SwiftUI elements live here)
         for child in (element.accessibilityElements as? [NSObject] ?? []) {
             if activateElement(at: point, in: child) { return true }
         }
-        // Recurse into UIView subviews for UIKit-hosted hierarchies
         if let view = element as? UIView {
             for subview in view.subviews.reversed() {
                 if activateElement(at: point, in: subview) { return true }
@@ -318,16 +329,23 @@ extension RemoteControlSession: MCSessionDelegate {
     func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
         DispatchQueue.main.async {
             switch state {
+            case .connecting:
+                // Nothing to do — pendingInvitePeers already tracks this.
+                break
             case .connected:
+                self.pendingInvitePeers.remove(peerID.displayName)
+                self.isConnecting = false
                 if !self.connectedPeers.contains(peerID) { self.connectedPeers.append(peerID) }
                 if self.role == .controller { self.browser?.stopBrowsingForPeers() }
             case .notConnected:
+                // Allow retrying the same peer on the next tap.
+                self.pendingInvitePeers.remove(peerID.displayName)
+                self.isConnecting = self.pendingInvitePeers.isEmpty ? false : self.isConnecting
                 self.connectedPeers.removeAll { $0 == peerID }
                 if self.role == .controller, let brw = self.browser { brw.startBrowsingForPeers() }
             default:
                 break
             }
-            // Keep the capture-thread-safe mirror in sync
             self.capturePeersLock.lock()
             self.capturePeers = self.connectedPeers
             self.capturePeersLock.unlock()
@@ -349,6 +367,11 @@ extension RemoteControlSession: MCSessionDelegate {
                 self.touchEventID += 1
                 if self.role == .broadcaster { self.performRemoteTouch(event) }
             }
+        case Self.textInputMarker:
+            guard let text = String(data: payload, encoding: .utf8) else { return }
+            DispatchQueue.main.async {
+                if self.role == .broadcaster { self.insertTextIntoFirstResponder(text) }
+            }
         default:
             break
         }
@@ -363,7 +386,8 @@ extension RemoteControlSession: MCSessionDelegate {
 
 extension RemoteControlSession: MCNearbyServiceAdvertiserDelegate {
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        let accept = connectedPeers.isEmpty
+        // Accept only if we have no connected peer and the session is live.
+        let accept = connectedPeers.isEmpty && mcSession != nil
         invitationHandler(accept, accept ? mcSession : nil)
     }
 
@@ -382,7 +406,11 @@ extension RemoteControlSession: MCNearbyServiceBrowserDelegate {
     }
 
     func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
-        DispatchQueue.main.async { self.availablePeers.removeAll { $0 == peerID } }
+        DispatchQueue.main.async {
+            self.availablePeers.removeAll { $0 == peerID }
+            // Allow retrying if this peer was in-flight.
+            self.pendingInvitePeers.remove(peerID.displayName)
+        }
     }
 
     func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {

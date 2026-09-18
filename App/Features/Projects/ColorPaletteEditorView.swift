@@ -24,6 +24,7 @@ struct ColorPaletteEditorView: View {
     let project: Project
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(LocalizationManager.self) private var l10n
     @State private var stops: [EditableStop] = []
     /// Tracks which row's threshold field is active so we validate on commit.
     @FocusState private var focusedIndex: Int?
@@ -45,20 +46,20 @@ struct ColorPaletteEditorView: View {
                 bandList
             }
             .scanArtScreenBackground()
-            .navigationTitle("Color Palette")
+            .navigationTitle(l10n("palette.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(l10n("action.cancel")) { dismiss() }
                         .foregroundStyle(ScanArtTheme.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save(); dismiss() }
+                    Button(l10n("action.save")) { save(); dismiss() }
                         .fontWeight(.semibold)
                         .foregroundStyle(ScanArtTheme.accent)
                 }
                 ToolbarItem(placement: .keyboard) {
-                    Button("Done") { focusedIndex = nil }
+                    Button(l10n("action.done")) { focusedIndex = nil }
                 }
             }
             .onAppear { loadStops() }
@@ -69,7 +70,7 @@ struct ColorPaletteEditorView: View {
 
     private var previewSection: some View {
         VStack(alignment: .leading, spacing: ScanArtTheme.spacingS) {
-            Text("GRADIENT PREVIEW")
+            Text(l10n("palette.preview"))
                 .font(ScanArtTheme.label())
                 .foregroundStyle(ScanArtTheme.textTertiary)
 
@@ -81,7 +82,7 @@ struct ColorPaletteEditorView: View {
 
             HStack {
                 if project.hasCustomColors {
-                    Button("Reset to Default") {
+                    Button(l10n("palette.resetToDefault")) {
                         project.resetCustomColors()
                         loadStops()
                     }
@@ -89,7 +90,7 @@ struct ColorPaletteEditorView: View {
                     .foregroundStyle(ScanArtTheme.statusDanger)
                 }
                 Spacer()
-                Text("\(stops.count) bands")
+                Text("\(stops.count) \(l10n("palette.bands"))")
                     .font(ScanArtTheme.body(12))
                     .foregroundStyle(ScanArtTheme.textTertiary)
             }

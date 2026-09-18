@@ -6,6 +6,7 @@ struct HomeView: View {
     @Binding var path: NavigationPath
     @Binding var isCreatingProject: Bool
     @Environment(\.diContainer) private var di
+    @Environment(LocalizationManager.self) private var l10n
 
     @State private var recentProjects: [Project] = []
     @State private var loadError: String?
@@ -25,15 +26,15 @@ struct HomeView: View {
             .padding(.bottom, ScanArtTheme.spacingXL)
         }
         .scanArtScreenBackground()
-        .navigationTitle("Scan Art")
+        .navigationTitle(l10n("app.name"))
         .navigationBarTitleDisplayMode(.large)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button("Settings", systemImage: "gearshape") { path.append(AppRoute.settings) }
-                    Button("Help", systemImage: "questionmark.circle") { path.append(AppRoute.help) }
-                    Button("About", systemImage: "info.circle") { path.append(AppRoute.about) }
+                    Button(l10n("nav.settings"), systemImage: "gearshape") { path.append(AppRoute.settings) }
+                    Button(l10n("nav.help"), systemImage: "questionmark.circle") { path.append(AppRoute.help) }
+                    Button(l10n("nav.about"), systemImage: "info.circle") { path.append(AppRoute.about) }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .foregroundStyle(ScanArtTheme.textPrimary)
@@ -46,13 +47,13 @@ struct HomeView: View {
 
     private var actionButtons: some View {
         VStack(spacing: ScanArtTheme.spacingS) {
-            PrimaryButton("New Project", systemImage: "plus.circle.fill") {
+            PrimaryButton(l10n("home.newProject"), systemImage: "plus.circle.fill") {
                 isCreatingProject = true
             }
-            SecondaryButton("All Projects", systemImage: "square.grid.2x2") {
+            SecondaryButton(l10n("home.allProjects"), systemImage: "square.grid.2x2") {
                 path.append(AppRoute.projectList)
             }
-            SecondaryButton("Remote Control", systemImage: "display.2") {
+            SecondaryButton(l10n("nav.remoteControl"), systemImage: "display.2") {
                 path.append(AppRoute.remoteControl)
             }
         }
@@ -65,10 +66,10 @@ struct HomeView: View {
                     .font(.system(size: 48, weight: .light))
                     .foregroundStyle(ScanArtTheme.accent)
                     .padding(.top, ScanArtTheme.spacingS)
-                Text("No projects yet")
+                Text(l10n("home.noProjectsYet"))
                     .font(ScanArtTheme.title(18))
                     .foregroundStyle(ScanArtTheme.textPrimary)
-                Text("Tap New Project to start measuring\nplaster thickness with LiDAR.")
+                Text(l10n("home.noProjectsSubtitle"))
                     .font(ScanArtTheme.body(14))
                     .foregroundStyle(ScanArtTheme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -80,7 +81,7 @@ struct HomeView: View {
 
     private var recentSection: some View {
         VStack(alignment: .leading, spacing: ScanArtTheme.spacingS) {
-            Text("RECENT PROJECTS")
+            Text(l10n("home.recentProjects"))
                 .font(ScanArtTheme.label())
                 .foregroundStyle(ScanArtTheme.textTertiary)
                 .padding(.top, ScanArtTheme.spacingXS)
@@ -88,7 +89,7 @@ struct HomeView: View {
                 Button {
                     path.append(AppRoute.projectDetail(projectID: project.id))
                 } label: {
-                    ProjectRow(project: project, thumbnailURL: thumbnailURL(for: project))
+                    ProjectRow(project: project, thumbnailURL: thumbnailURL(for: project), scansLabel: l10n("home.scans"))
                 }
                 .buttonStyle(.plain)
             }
@@ -118,6 +119,7 @@ struct HomeView: View {
 struct ProjectRow: View {
     let project: Project
     var thumbnailURL: URL? = nil
+    var scansLabel: String = "scans"
 
     var body: some View {
         HStack(spacing: ScanArtTheme.spacingM) {
@@ -146,7 +148,7 @@ struct ProjectRow: View {
                 Text("\(project.rescans.count)")
                     .font(ScanArtTheme.monospacedValue(14))
                     .foregroundStyle(ScanArtTheme.textTertiary)
-                Text("scans")
+                Text(scansLabel)
                     .font(ScanArtTheme.label(10))
                     .foregroundStyle(ScanArtTheme.textTertiary)
             }

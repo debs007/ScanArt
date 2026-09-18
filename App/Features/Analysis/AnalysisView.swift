@@ -9,9 +9,9 @@ struct AnalysisView: View {
     let projectID: UUID
     let scanID: UUID
     @Environment(\.diContainer) private var di
+    @Environment(LocalizationManager.self) private var l10n
 
     @StateObject private var viewModel: AnalysisViewModelBox
-    @State private var isShowingExportMenu = false
     @State private var isShowingStatsSheet = false
     @State private var shareURL: URL?
 
@@ -26,18 +26,21 @@ struct AnalysisView: View {
             ScanArtTheme.backgroundPrimary.ignoresSafeArea()
 
             if let vm = viewModel.vm {
+                // The mesh is always rendered so the user can inspect/rotate
+                // before and after generation. Gestures (pan, pinch) are handled
+                // inside MetalMeshView via UIKit gesture recognizers.
                 MetalMeshView(controller: vm.meshViewController)
                     .ignoresSafeArea()
 
                 VStack {
                     Spacer()
-                    bottomPanel(vm: vm)
+                    if vm.hasResult {
+                        bottomPanel(vm: vm)
+                    } else {
+                        generatePrompt(vm: vm)
+                    }
                 }
                 .padding(ScanArtTheme.spacingM)
-
-                if !vm.hasResult {
-                    generatePrompt(vm: vm)
-                }
 
                 if let error = vm.errorMessage {
                     errorToast(error) { vm.errorMessage = nil }
@@ -46,7 +49,7 @@ struct AnalysisView: View {
                 ProgressView().tint(ScanArtTheme.accent)
             }
         }
-        .navigationTitle("Analysis")
+        .navigationTitle(l10n("analysis.title"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let vm = viewModel.vm, vm.hasResult {
@@ -79,34 +82,40 @@ struct AnalysisView: View {
         }
     }
 
+    // MARK: - Generate prompt (shown at bottom so the mesh stays visible)
+
     @ViewBuilder
     private func generatePrompt(vm: AnalysisViewModel) -> some View {
         VStack(spacing: ScanArtTheme.spacingM) {
-            Image(systemName: "wand.and.rays")
-                .font(.system(size: 36))
-                .foregroundStyle(ScanArtTheme.accent)
-            Text("Thickness map not generated yet")
-                .font(ScanArtTheme.title(17))
-                .foregroundStyle(ScanArtTheme.textPrimary)
-            Text("Compares this rescan against the project's original scan to compute \(vm.project?.projectType.measurementDescription ?? "thickness").")
-                .font(ScanArtTheme.body(13))
-                .foregroundStyle(ScanArtTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, ScanArtTheme.spacingL)
+            HStack(spacing: ScanArtTheme.spacingM) {
+                Image(systemName: "wand.and.rays")
+                    .font(.system(size: 28))
+                    .foregroundStyle(ScanArtTheme.accent)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(l10n("analysis.thicknessMapNotGenerated"))
+                        .font(ScanArtTheme.title(15))
+                        .foregroundStyle(ScanArtTheme.textPrimary)
+                    Text("Compares this rescan against the project's original scan to compute \(vm.project?.projectType.measurementDescription ?? "thickness").")
+                        .font(ScanArtTheme.body(12))
+                        .foregroundStyle(ScanArtTheme.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if vm.isGenerating {
-                ProgressView("Computing…").tint(ScanArtTheme.accent)
+                ProgressView(l10n("analysis.computing")).tint(ScanArtTheme.accent)
+                    .frame(maxWidth: .infinity, alignment: .center)
             } else {
-                PrimaryButton("Generate Thickness Map", systemImage: "wand.and.rays") {
+                PrimaryButton(l10n("analysis.generateThicknessMap"), systemImage: "wand.and.rays") {
                     Task { await vm.generateThicknessMap() }
                 }
-                .padding(.horizontal, ScanArtTheme.spacingXL)
             }
         }
-        .padding(ScanArtTheme.spacingL)
+        .padding(ScanArtTheme.spacingM)
         .glassPanel()
-        .padding(ScanArtTheme.spacingL)
     }
+
+    // MARK: - Bottom panel (stats, shown after generation)
 
     @ViewBuilder
     private func bottomPanel(vm: AnalysisViewModel) -> some View {
@@ -123,7 +132,7 @@ struct AnalysisView: View {
                 Button {
                     isShowingStatsSheet = true
                 } label: {
-                    Label("Full Statistics", systemImage: "chart.bar.doc.horizontal")
+                    Label(l10n("analysis.fullStatistics"), systemImage: "chart.bar.doc.horizontal")
                         .font(ScanArtTheme.body(13))
                         .foregroundStyle(ScanArtTheme.textSecondary)
                 }

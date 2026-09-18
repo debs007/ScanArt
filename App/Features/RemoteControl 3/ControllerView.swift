@@ -6,9 +6,12 @@ import ScanArtUI
 /// Displays the live screen stream and forwards taps back as RemoteTouchEvents.
 struct ControllerView: View {
     let session: RemoteControlSession
+    @Environment(LocalizationManager.self) private var l10n
 
     @State private var isDragging = false
     @State private var tapIndicatorPoint: CGPoint?
+    @State private var showingKeyboardInput = false
+    @State private var keyboardInputText = ""
 
     var body: some View {
         Group {
@@ -19,11 +22,14 @@ struct ControllerView: View {
             }
         }
         .scanArtScreenBackground()
-        .navigationTitle("Join Room")
+        .navigationTitle(l10n("remote.joinRoom"))
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .onAppear { session.startBrowsing() }
         .onDisappear { session.disconnect() }
+        .sheet(isPresented: $showingKeyboardInput) {
+            keyboardInputSheet
+        }
     }
 
     // MARK: - Peer browser (pre-connect)
@@ -42,7 +48,7 @@ struct ControllerView: View {
 
             Spacer()
 
-            SecondaryButton("Cancel", systemImage: "xmark.circle") {
+            SecondaryButton(l10n("action.cancel"), systemImage: "xmark.circle") {
                 session.disconnect()
             }
             .padding(.horizontal, ScanArtTheme.spacingL)
@@ -55,7 +61,7 @@ struct ControllerView: View {
             ProgressView()
                 .scaleEffect(1.4)
                 .tint(ScanArtTheme.accent)
-            Text("Searching for broadcasters…")
+            Text(l10n("remote.searchingBroadcasters"))
                 .font(ScanArtTheme.body())
                 .foregroundStyle(ScanArtTheme.textSecondary)
         }
@@ -68,10 +74,10 @@ struct ControllerView: View {
                 Image(systemName: "wifi.exclamationmark")
                     .font(.system(size: 36, weight: .ultraLight))
                     .foregroundStyle(ScanArtTheme.textTertiary)
-                Text("No broadcasters found")
+                Text(l10n("remote.noBroadcastersFound"))
                     .font(ScanArtTheme.body(15))
                     .foregroundStyle(ScanArtTheme.textSecondary)
-                Text("Open Scan Art on the other device, tap Remote Control → Broadcast Screen, then return here.")
+                Text(l10n("remote.noBroadcastersNote"))
                     .font(ScanArtTheme.body(13))
                     .foregroundStyle(ScanArtTheme.textTertiary)
                     .multilineTextAlignment(.center)
@@ -82,7 +88,7 @@ struct ControllerView: View {
 
     private var peersSection: some View {
         VStack(alignment: .leading, spacing: ScanArtTheme.spacingS) {
-            Text("AVAILABLE ROOMS")
+            Text(l10n("remote.availableRooms"))
                 .font(ScanArtTheme.label())
                 .foregroundStyle(ScanArtTheme.textTertiary)
                 .padding(.horizontal, ScanArtTheme.spacingL)
@@ -102,14 +108,18 @@ struct ControllerView: View {
                             Text(peer.displayName)
                                 .font(ScanArtTheme.body(16))
                                 .foregroundStyle(ScanArtTheme.textPrimary)
-                            Text("Broadcasting · tap to connect")
+                            Text(l10n("remote.broadcasting.tapToConnect"))
                                 .font(ScanArtTheme.body(12))
                                 .foregroundStyle(ScanArtTheme.statusGood)
                         }
                         Spacer()
-                        Image(systemName: "arrow.right.circle.fill")
-                            .foregroundStyle(ScanArtTheme.accent)
-                            .font(.system(size: 22, weight: .light))
+                        if session.isConnecting {
+                            ProgressView().scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .foregroundStyle(ScanArtTheme.accent)
+                                .font(.system(size: 22, weight: .light))
+                        }
                     }
                     .padding(ScanArtTheme.spacingM)
                     .background(
@@ -118,6 +128,7 @@ struct ControllerView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .disabled(session.isConnecting)
                 .padding(.horizontal, ScanArtTheme.spacingL)
             }
         }
@@ -141,7 +152,7 @@ struct ControllerView: View {
 
     private var connectionBar: some View {
         HStack {
-            Label("Connected", systemImage: "circle.fill")
+            Label(l10n("remote.connectedTo"), systemImage: "circle.fill")
                 .font(ScanArtTheme.label())
                 .foregroundStyle(ScanArtTheme.statusGood)
                 .labelStyle(.titleAndIcon)
@@ -155,7 +166,17 @@ struct ControllerView: View {
 
             Spacer()
 
-            Button("Disconnect") {
+            // Keyboard button — lets the controller type text into a remote text field.
+            Button {
+                showingKeyboardInput = true
+            } label: {
+                Image(systemName: "keyboard")
+                    .font(.system(size: 16, weight: .light))
+                    .foregroundStyle(ScanArtTheme.accent)
+                    .padding(.trailing, ScanArtTheme.spacingS)
+            }
+
+            Button(l10n("action.disconnect")) {
                 session.disconnect()
             }
             .font(ScanArtTheme.body(14))
@@ -165,6 +186,54 @@ struct ControllerView: View {
         .padding(.vertical, ScanArtTheme.spacingM)
         .background(ScanArtTheme.backgroundSecondary)
     }
+
+    // MARK: - Keyboard input sheet
+
+    private var keyboardInputSheet: some View {
+        NavigationStack {
+            VStack(spacing: ScanArtTheme.spacingL) {
+                Text(l10n("remote.keyboard.prompt"))
+                    .font(ScanArtTheme.body(14))
+                    .foregroundStyle(ScanArtTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+
+                TextField(l10n("remote.keyboard.placeholder"), text: $keyboardInputText, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(4...8)
+                    .padding(.horizontal)
+
+                Spacer()
+            }
+            .padding(.top, ScanArtTheme.spacingL)
+            .navigationTitle(l10n("remote.keyboard"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(l10n("action.cancel")) {
+                        keyboardInputText = ""
+                        showingKeyboardInput = false
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(l10n("action.send")) {
+                        let text = keyboardInputText
+                        if !text.isEmpty {
+                            session.sendTextInput(text)
+                            keyboardInputText = ""
+                        }
+                        showingKeyboardInput = false
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(keyboardInputText.isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+    }
+
+    // MARK: - Screen view with gesture forwarding
 
     private func screenView(image: UIImage, containerSize: CGSize) -> some View {
         let frame = imageDisplayFrame(imageSize: image.size, in: containerSize)
@@ -224,7 +293,7 @@ struct ControllerView: View {
             ProgressView()
                 .scaleEffect(1.4)
                 .tint(ScanArtTheme.accent)
-            Text("Waiting for screen stream…")
+            Text(l10n("remote.waitingForStream"))
                 .font(ScanArtTheme.body())
                 .foregroundStyle(ScanArtTheme.textSecondary)
         }

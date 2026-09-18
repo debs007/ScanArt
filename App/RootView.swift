@@ -32,6 +32,11 @@ struct RootView: View {
     @State private var remoteCursorPosition: CGPoint = .zero
     @State private var showRemoteCursor = false
 
+    // Draggable broadcasting banner state
+    @State private var bannerDragOffset = CGSize.zero
+    @State private var bannerLastOffset = CGSize.zero
+    @State private var isBannerMinimized = false
+
     var body: some View {
         NavigationStack(path: $path) {
             HomeView(path: $path, isCreatingProject: $isCreatingProject)
@@ -55,16 +60,44 @@ struct RootView: View {
                 .transition(.opacity)
             }
         }
-        // Floating broadcasting banner — visible on every screen while active
-        .overlay(alignment: .bottom) {
+        // Floating broadcasting banner — draggable, minimizable, visible on every screen
+        .overlay {
             if remoteSession.role == .broadcaster {
-                BroadcastingBanner(session: remoteSession)
-                    .padding(.bottom, 20)
-                    .padding(.horizontal, 24)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                GeometryReader { geo in
+                    let defaultX = geo.size.width / 2
+                    let defaultY = geo.size.height - 70
+                    let clampedX = min(max(70, defaultX + bannerDragOffset.width), geo.size.width - 70)
+                    let clampedY = min(max(80, defaultY + bannerDragOffset.height), geo.size.height - 30)
+
+                    BroadcastingBanner(session: remoteSession, isMinimized: $isBannerMinimized)
+                        .fixedSize()
+                        .position(x: clampedX, y: clampedY)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    bannerDragOffset = CGSize(
+                                        width: bannerLastOffset.width + value.translation.width,
+                                        height: bannerLastOffset.height + value.translation.height
+                                    )
+                                }
+                                .onEnded { _ in
+                                    bannerLastOffset = bannerDragOffset
+                                }
+                        )
+                }
+                .ignoresSafeArea()
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: remoteSession.role == .broadcaster)
+        // Reset banner position when broadcasting ends
+        .onChange(of: remoteSession.role) { _, newRole in
+            if newRole == nil {
+                bannerDragOffset = .zero
+                bannerLastOffset = .zero
+                isBannerMinimized = false
+            }
+        }
         // Remote cursor overlay — shows where the controller tapped
         .overlay {
             if showRemoteCursor {
@@ -138,9 +171,34 @@ struct RootView: View {
 
 private struct BroadcastingBanner: View {
     let session: RemoteControlSession
+    @Binding var isMinimized: Bool
     @State private var showingStopConfirm = false
 
     var body: some View {
+        if isMinimized {
+            minimizedPill
+        } else {
+            expandedBanner
+        }
+    }
+
+    private var minimizedPill: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                isMinimized = false
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(.regularMaterial)
+                    .frame(width: 46, height: 46)
+                    .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
+                PulsingDot()
+            }
+        }
+    }
+
+    private var expandedBanner: some View {
         HStack(spacing: 10) {
             PulsingDot()
             VStack(alignment: .leading, spacing: 2) {
@@ -157,7 +215,19 @@ private struct BroadcastingBanner: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
+            // Minimize — collapses to pulsing dot so the banner is out of the way
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                    isMinimized = true
+                }
+            } label: {
+                Image(systemName: "minus")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 26, height: 26)
+                    .background(Color.secondary.opacity(0.15), in: Circle())
+            }
             Button("Stop") {
                 showingStopConfirm = true
             }

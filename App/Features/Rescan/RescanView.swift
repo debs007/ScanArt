@@ -10,6 +10,7 @@ struct RescanView: View {
     let projectID: UUID
     @Binding var path: NavigationPath
     @Environment(\.diContainer) private var di
+    @Environment(LocalizationManager.self) private var l10n
 
     @StateObject private var viewModel = RescanViewModelBox()
     @State private var isShowingFinishSheet = false
@@ -99,7 +100,6 @@ struct RescanView: View {
     @ViewBuilder
     private func bottomBar(vm: RescanViewModel) -> some View {
         VStack(spacing: ScanArtTheme.spacingS) {
-            // Color legend — only visible once the heatmap is actually applied.
             if vm.heatmapGenerated {
                 ThicknessColorLegend(
                     targetMM: Double(vm.targetThicknessMM),
@@ -108,23 +108,24 @@ struct RescanView: View {
                 )
             }
 
-            // Swipeable stat pages — page dots stay within the fixed frame.
             TabView {
                 // Page 1 — scan progress
                 HStack(spacing: ScanArtTheme.spacingS) {
                     StatCard(
-                        label: "Mesh",
+                        label: l10n("scan.mesh"),
                         value: "\(vm.sessionManager.meshAnchorCount)",
-                        unit: "anchors"
+                        unit: l10n("scan.anchors")
                     )
                     StatCard(
-                        label: "Coverage",
+                        label: l10n("scan.coverage"),
                         value: "\(Int(vm.sessionManager.estimatedCoveragePercent))",
                         unit: "%"
                     )
                     StatCard(
-                        label: "Colors",
-                        value: vm.heatmapGenerated ? "Active" : (vm.originalMesh != nil ? "Ready" : "Loading"),
+                        label: l10n("rescan.colors"),
+                        value: vm.heatmapGenerated
+                            ? l10n("rescan.colors.active")
+                            : (vm.originalMesh != nil ? l10n("rescan.colors.ready") : l10n("rescan.colors.loading")),
                         tint: vm.heatmapGenerated
                             ? ScanArtTheme.statusGood
                             : (vm.originalMesh != nil ? ScanArtTheme.accent : ScanArtTheme.statusWarning)
@@ -135,13 +136,13 @@ struct RescanView: View {
                 HStack(spacing: ScanArtTheme.spacingS) {
                     if let vol = vm.estimatedVolumeLiters {
                         StatCard(
-                            label: vm.projectType == .excavation ? "Excav. Vol." : "Plaster Vol.",
+                            label: vm.projectType == .excavation ? l10n("rescan.volume.excavation") : l10n("rescan.volume.plaster"),
                             value: String(format: "%.1f", vol),
                             unit: "L",
                             tint: ScanArtTheme.accent
                         )
                         StatCard(
-                            label: "Cubic Meters",
+                            label: l10n("rescan.cubicMeters"),
                             value: String(format: "%.3f", vol / 1000),
                             unit: "m³"
                         )
@@ -153,12 +154,10 @@ struct RescanView: View {
             .tabViewStyle(.page(indexDisplayMode: .always))
             .frame(height: 100)
 
-            // Heatmap + Reset row — sits above Finish Rescan, never scrolls.
             heatmapRow(vm: vm)
 
-            // Static — never participates in the swipe gesture.
             PrimaryButton(
-                "Finish Rescan",
+                l10n("rescan.finish"),
                 systemImage: "checkmark.circle.fill",
                 isEnabled: vm.canFinish
             ) {
@@ -170,11 +169,10 @@ struct RescanView: View {
     @ViewBuilder
     private func heatmapRow(vm: RescanViewModel) -> some View {
         HStack(spacing: ScanArtTheme.spacingS) {
-            // Reset — always enabled; restarts the ARKit session and clears heatmap.
             Button {
                 vm.resetScan()
             } label: {
-                Label("Reset", systemImage: "arrow.counterclockwise")
+                Label(l10n("action.reset"), systemImage: "arrow.counterclockwise")
                     .font(ScanArtTheme.body(14))
                     .foregroundStyle(ScanArtTheme.textPrimary)
                     .frame(maxWidth: .infinity)
@@ -186,11 +184,10 @@ struct RescanView: View {
             }
 
             if vm.heatmapGenerated {
-                // Heatmap active indicator replaces the button once applied.
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(ScanArtTheme.statusGood)
-                    Text("Heatmap Active")
+                    Text(l10n("rescan.heatmapActive"))
                         .font(ScanArtTheme.body(14))
                         .foregroundStyle(ScanArtTheme.statusGood)
                 }
@@ -201,11 +198,10 @@ struct RescanView: View {
                         .fill(ScanArtTheme.surfaceElevated)
                 )
             } else {
-                // Generate Heatmap — enabled once the original mesh (and its hash) is ready.
                 Button {
                     vm.generateHeatmap()
                 } label: {
-                    Label("Heatmap", systemImage: "paintpalette.fill")
+                    Label(l10n("rescan.heatmap"), systemImage: "paintpalette.fill")
                         .font(ScanArtTheme.body(14))
                         .foregroundStyle(
                             vm.originalMesh != nil
@@ -234,7 +230,7 @@ struct RescanView: View {
                 if vm.isComputingVolume {
                     HStack(spacing: 8) {
                         ProgressView().tint(ScanArtTheme.accent).scaleEffect(0.8)
-                        Text("Calculating…")
+                        Text(l10n("rescan.calculating"))
                             .font(ScanArtTheme.body(13))
                             .foregroundStyle(ScanArtTheme.textSecondary)
                     }
@@ -243,7 +239,7 @@ struct RescanView: View {
                         vm.computeVolumeOnce()
                     } label: {
                         Label(
-                            vm.originalMesh != nil ? "Calculate" : "Loading mesh…",
+                            vm.originalMesh != nil ? l10n("action.calculate") : l10n("rescan.loadingMesh"),
                             systemImage: "function"
                         )
                         .font(ScanArtTheme.body(13))
@@ -329,18 +325,18 @@ struct RescanView: View {
     private var finishSheet: some View {
         NavigationStack {
             Form {
-                Section("Label (optional)") {
-                    TextField("e.g. After Second Coat", text: $scanLabel)
+                Section(l10n("scan.label.optional")) {
+                    TextField(l10n("rescan.label.placeholder"), text: $scanLabel)
                 }
             }
-            .navigationTitle("Save Rescan")
+            .navigationTitle(l10n("rescan.save"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { isShowingFinishSheet = false }
+                    Button(l10n("action.cancel")) { isShowingFinishSheet = false }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(viewModel.vm?.isSaving == true ? "Saving…" : "Save") {
+                    Button(viewModel.vm?.isSaving == true ? l10n("action.saving") : l10n("action.save")) {
                         Task {
                             await viewModel.vm?.finishAndSave(label: scanLabel)
                             isShowingFinishSheet = false

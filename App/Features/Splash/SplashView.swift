@@ -8,6 +8,7 @@ import ScanArtUI
 struct SplashView: View {
     let onFinished: () -> Void
     @State private var isCapable: Bool? = nil
+    @Environment(LocalizationManager.self) private var l10n
 
     var body: some View {
         ZStack {
@@ -17,10 +18,10 @@ struct SplashView: View {
                 Image(systemName: "cube.transparent")
                     .font(.system(size: 64, weight: .light))
                     .foregroundStyle(ScanArtTheme.accent)
-                Text("Scan Art")
+                Text(l10n("app.name"))
                     .font(ScanArtTheme.numericDisplay(30))
                     .foregroundStyle(ScanArtTheme.textPrimary)
-                Text("LiDAR Plaster Thickness Measurement")
+                Text(l10n("splash.tagline"))
                     .font(ScanArtTheme.body())
                     .foregroundStyle(ScanArtTheme.textSecondary)
 
@@ -51,10 +52,10 @@ struct SplashView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 32))
                 .foregroundStyle(ScanArtTheme.statusDanger)
-            Text("This device is not supported.")
+            Text(l10n("splash.unsupported"))
                 .font(ScanArtTheme.title(18))
                 .foregroundStyle(ScanArtTheme.textPrimary)
-            Text("Scan Art requires a LiDAR Scanner, available on iPhone Pro and iPad Pro models.")
+            Text(l10n("splash.unsupportedNote"))
                 .font(ScanArtTheme.body(13))
                 .foregroundStyle(ScanArtTheme.textSecondary)
                 .multilineTextAlignment(.center)

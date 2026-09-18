@@ -6,6 +6,7 @@ import ScanArtUI
 struct ReportListView: View {
     let projectID: UUID
     @Environment(\.diContainer) private var di
+    @Environment(LocalizationManager.self) private var l10n
 
     @State private var project: Project?
     @State private var shareURL: URL?
@@ -25,7 +26,7 @@ struct ReportListView: View {
             .padding(ScanArtTheme.spacingM)
         }
         .scanArtScreenBackground()
-        .navigationTitle("Reports")
+        .navigationTitle(l10n("reports.title"))
         .navigationBarTitleDisplayMode(.inline)
         .task { load() }
         .onAppear { load() }
@@ -39,10 +40,10 @@ struct ReportListView: View {
             Image(systemName: "doc.text.magnifyingglass")
                 .font(.system(size: 36))
                 .foregroundStyle(ScanArtTheme.textTertiary)
-            Text("No reports yet")
+            Text(l10n("reports.empty"))
                 .font(ScanArtTheme.body(15))
                 .foregroundStyle(ScanArtTheme.textSecondary)
-            Text("Generate one from the Analysis screen after computing a thickness map.")
+            Text(l10n("reports.emptyNote"))
                 .font(ScanArtTheme.body(12))
                 .foregroundStyle(ScanArtTheme.textTertiary)
                 .multilineTextAlignment(.center)

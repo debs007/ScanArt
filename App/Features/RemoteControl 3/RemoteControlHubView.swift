@@ -9,6 +9,7 @@ import ScanArtUI
 ///   • controller  → show ControllerView (peer browser + live stream)
 struct RemoteControlHubView: View {
     @Environment(RemoteControlSession.self) private var session
+    @Environment(LocalizationManager.self) private var l10n
 
     var body: some View {
         Group {
@@ -28,9 +29,9 @@ struct RemoteControlHubView: View {
 
     private var navigationTitle: String {
         switch session.role {
-        case .broadcaster: return "Broadcasting"
-        case .controller: return "Join Room"
-        case .none: return "Remote Control"
+        case .broadcaster: return l10n("remote.broadcasting")
+        case .controller:  return l10n("remote.joinRoom")
+        case .none:        return l10n("remote.title")
         }
     }
 
@@ -44,7 +45,7 @@ struct RemoteControlHubView: View {
 
                 instructionCard
 
-                PrimaryButton("Stop Broadcasting", systemImage: "stop.circle.fill", isDestructive: true) {
+                PrimaryButton(l10n("remote.stopBroadcasting"), systemImage: "stop.circle.fill", isDestructive: true) {
                     session.stopBroadcasting()
                 }
             }
@@ -59,10 +60,10 @@ struct RemoteControlHubView: View {
                 HStack(spacing: ScanArtTheme.spacingM) {
                     captureStatusIcon
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(session.isCaptureActive ? "Broadcasting" : "Starting…")
+                        Text(session.isCaptureActive ? l10n("remote.broadcasting") : l10n("remote.starting"))
                             .font(ScanArtTheme.body(16))
                             .foregroundStyle(ScanArtTheme.textPrimary)
-                        Text("From: \(UIDevice.current.name)")
+                        Text("\(l10n("remote.from")) \(UIDevice.current.name)")
                             .font(ScanArtTheme.body(12))
                             .foregroundStyle(ScanArtTheme.textSecondary)
                     }
@@ -75,11 +76,11 @@ struct RemoteControlHubView: View {
                 Divider().background(ScanArtTheme.surfaceBorder)
 
                 VStack(alignment: .leading, spacing: ScanArtTheme.spacingXS) {
-                    Text("CONNECTED CONTROLLERS")
+                    Text(l10n("remote.connectedControllers"))
                         .font(ScanArtTheme.label())
                         .foregroundStyle(ScanArtTheme.textTertiary)
                     if session.connectedPeers.isEmpty {
-                        Text("Waiting for a device to join…")
+                        Text(l10n("remote.waitingForDevice"))
                             .font(ScanArtTheme.body(14))
                             .foregroundStyle(ScanArtTheme.textTertiary)
                     } else {
@@ -121,10 +122,10 @@ struct RemoteControlHubView: View {
                     .foregroundStyle(ScanArtTheme.accent)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Use the app freely")
+                    Text(l10n("remote.useAppFreely"))
                         .font(ScanArtTheme.body(15))
                         .foregroundStyle(ScanArtTheme.textPrimary)
-                    Text("Navigate anywhere — the controller sees whatever screen you're on and can tap to control it. A broadcasting indicator stays visible at the bottom of every screen.")
+                    Text(l10n("remote.useAppFreelySubtitle"))
                         .font(ScanArtTheme.body(13))
                         .foregroundStyle(ScanArtTheme.textSecondary)
                 }
@@ -145,10 +146,10 @@ struct RemoteControlHubView: View {
                     .background(ScanArtTheme.surfaceBorder)
 
                 VStack(spacing: ScanArtTheme.spacingS) {
-                    PrimaryButton("Broadcast Screen", systemImage: "dot.radiowaves.left.and.right") {
+                    PrimaryButton(l10n("remote.broadcastScreen"), systemImage: "dot.radiowaves.left.and.right") {
                         session.startBroadcasting()
                     }
-                    SecondaryButton("Join a Room", systemImage: "person.wave.2") {
+                    SecondaryButton(l10n("remote.joinARoom"), systemImage: "person.wave.2") {
                         session.startBrowsing()
                     }
                 }
@@ -166,11 +167,11 @@ struct RemoteControlHubView: View {
             Image(systemName: "display.2")
                 .font(.system(size: 60, weight: .ultraLight))
                 .foregroundStyle(ScanArtTheme.accent)
-            Text("Peer-to-Peer Screen Control")
+            Text(l10n("remote.peerToPeerTitle"))
                 .font(ScanArtTheme.title())
                 .foregroundStyle(ScanArtTheme.textPrimary)
                 .multilineTextAlignment(.center)
-            Text("Share your screen and let another device control it — over WiFi or Bluetooth, no internet required.")
+            Text(l10n("remote.peerToPeerSubtitle"))
                 .font(ScanArtTheme.body(14))
                 .foregroundStyle(ScanArtTheme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -182,16 +183,16 @@ struct RemoteControlHubView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: ScanArtTheme.spacingM) {
                 infoRow(icon: "dot.radiowaves.left.and.right", color: ScanArtTheme.accent,
-                        title: "Broadcast Screen",
-                        body: "Streams your screen to a controller. Navigate the app normally — the controller sees everything you do.")
+                        title: l10n("remote.info.broadcastScreen.title"),
+                        body: l10n("remote.info.broadcastScreen.body"))
                 Divider().background(ScanArtTheme.surfaceBorder)
                 infoRow(icon: "person.wave.2", color: ScanArtTheme.statusInfo,
-                        title: "Join a Room",
-                        body: "Connects to a broadcaster, shows their live screen, and sends your taps back to control it.")
+                        title: l10n("remote.info.joinRoom.title"),
+                        body: l10n("remote.info.joinRoom.body"))
                 Divider().background(ScanArtTheme.surfaceBorder)
                 infoRow(icon: "wifi", color: ScanArtTheme.statusGood,
-                        title: "WiFi or Bluetooth",
-                        body: "Both devices must be nearby. Works on the same local network or direct Bluetooth — no cloud.")
+                        title: l10n("remote.info.wifi.title"),
+                        body: l10n("remote.info.wifi.body"))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
